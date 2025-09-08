@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自动排班系统</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+    .description {
+      color: #7f8c8d;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    input[type="text"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    input[type="text"]:focus,
+    input[type="tel"]:focus {
+      border-color: #3498db;
+      outline: none;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background: #2980b9;
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: 100px repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .time-slot {
+      background: #34495e;
+      color: white;
+      padding: 15px 10px;
+      text-align: center;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .day-header {
+      background: #2c3e50;
+      color: white;
+      padding: 15px 10px;
+      text-align: center;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .schedule-cell {
+      background: #ecf0f1;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .schedule-cell.selected {
+      background: #2ecc71;
+      color: white;
+      font-weight: 600;
+    }
+    .schedule-cell:hover {
+      background: #bdc3c7;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 15px;
+      text-align: center;
+    }
+    th {
+      background-color: #2c3e50;
+      color: white;
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #ddd;
+    }
+    .tab {
+      padding: 12px 25px;
+      cursor: pointer;
+      background: #f8f9fa;
+      border-radius: 6px 6px 0 0;
+      margin-right: 5px;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+    .tab.active {
+      background: #3498db;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .admin-panel {
+      background: #fff8e1;
+      border-left: 4px solid #ffc107;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      background: #2ecc71;
+      color: white;
+      border-radius: 6px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      transform: translateX(100%);
+      transition: transform 0.3s;
+      z-index: 1000;
+    }
+    .notification.show {
+      transform: translateX(0);
+    }
+    @media (max-width: 768px) {
+      .schedule-grid {
+        grid-template-columns: 80px repeat(5, 1fr);
+        gap: 5px;
+      }
+      .time-slot, .day-header, .schedule-cell {
+        padding: 10px 5px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>自动排班系统</h1>
+    <p class="description">填写您的信息并选择可用时间段，管理员将根据所有提交的信息生成最优排班表</p>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('user')">填写可用时间</div>
+    <div class="tab" onclick="switchTab('admin')">管理员排班</div>
+  </div>
+
+  <div id="user" class="tab-content active">
+    <div class="card">
+      <h2>个人信息</h2>
+      <div class="form-group">
+        <label for="name">姓名</label>
+        <input type="text" id="name" placeholder="请输入您的姓名">
+      </div>
+      <div class="form-group">
+        <label for="phone">手机号码</label>
+        <input type="tel" id="phone" placeholder="请输入手机号码">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>选择您的可用时间</h2>
+      <p>请勾选您有空的时间段，提交后管理员将根据所有人的可用时间进行排班</p>
+
+      <div class="schedule-grid">
+        <div class="time-slot">时间/日期</div>
+        <div class="day-header">周一</div>
+        <div class="day-header">周二</div>
+        <div class="day-header">周三</div>
+        <div class="day-header">周四</div>
+        <div class="day-header">周五</div>
+
+        <!-- 时间行 -->
+        <div class="time-slot">8:00-10:00</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="8:00-10:00" data-day="周一">第一节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="8:00-10:00" data-day="周二">第一节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="8:00-10:00" data-day="周三">第一节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="8:00-10:00" data-day="周四">第一节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="8:00-10:00" data-day="周五">第一节</div>
+
+        <div class="time-slot">10:00-12:00</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="10:00-12:00" data-day="周一">第二节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="10:00-12:00" data-day="周二">第二节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="10:00-12:00" data-day="周三">第二节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="10:00-12:00" data-day="周四">第二节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="10:00-12:00" data-day="周五">第二节</div>
+
+        <div class="time-slot">14:00-16:00</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="14:00-16:00" data-day="周一">第三节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="14:00-16:00" data-day="周二">第三节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="14:00-16:00" data-day="周三">第三节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="14:00-16:00" data-day="周四">第三节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="14:00-16:00" data-day="周五">第三节</div>
+
+        <div class="time-slot">16:00-18:00</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周一">第四节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周二">第四节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周三">第四节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周四">第四节</div>
+        <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周五">第四节</div>
+      </div>
+
+      <button style="margin-top: 20px;" onclick="submitAvailability()">提交可用时间</button>
+    </div>
+  </div>
+
+  <div id="admin" class="tab-content">
+    <div class="card admin-panel">
+      <h2>管理员排班功能</h2>
+      <p>点击下方按钮生成排班表，系统将根据所有已提交的可用时间自动分配值班人员</p>
+      <button onclick="generateSchedule()">生成排班表</button>
+      <button onclick="clearAllData()" style="background: #e74c3c; margin-left: 10px;">清除所有数据</button>
+
+      <div id="schedule-result">
+        <h3 style="margin-top: 20px;">排班结果</h3>
+        <table id="schedule-table">
+          <thead>
+          <tr>
+            <th>时间/日期</th>
+            <th>周一</th>
+            <th>周二</th>
+            <th>周三</th>
+            <th>周四</th>
+            <th>周五</th>
+          </tr>
+          </thead>
+          <tbody>
+          <!-- 排班结果将通过JavaScript动态生成 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notification" id="notification">提交成功！</div>
+
+<script>
+  // 存储所有用户的可用时间
+  let allAvailability = JSON.parse(localStorage.getItem('allAvailability')) || {};
+
+  // 切换选项卡
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    document.querySelector(`.tab:${tabName === 'user' ? 'first-child' : 'last-child'}`).classList.add('active');
+    document.getElementById(tabName).classList.add('active');
+  }
+
+  // 显示通知
+  function showNotification(message) {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.classList.add('show');
+
+    setTimeout(() => {
+      notification.classList.remove('show');
+    }, 3000);
+  }
+
+  // 切换单元格选择状态
+  function toggleCell(cell) {
+    cell.classList.toggle('selected');
+  }
+
+  // 提交可用时间
+  function submitAvailability() {
+    const name = document.getElementById('name').value;
+    const phone = document.getElementById('phone').value;
+
+    if (!name || !phone) {
+      showNotification('请填写姓名和手机号码');
+      return;
+    }
+
+    const selectedCells = document.querySelectorAll('.schedule-cell.selected');
+    if (selectedCells.length === 0) {
+      showNotification('请至少选择一个可用时间段');
+      return;
+    }
+
+    const availability = [];
+    selectedCells.forEach(cell => {
+      availability.push({
+        day: cell.getAttribute('data-day'),
+        time: cell.getAttribute('data-time')
+      });
+    });
+
+    // 存储用户的可用时间
+    allAvailability[phone] = {
+      name: name,
+      availability: availability
+    };
+
+    // 保存到本地存储
+    localStorage.setItem('allAvailability', JSON.stringify(allAvailability));
+
+    // 清空表单
+    document.getElementById('name').value = '';
+    document.getElementById('phone').value = '';
+    document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
+      cell.classList.remove('selected');
+    });
+
+    showNotification('可用时间提交成功！');
+  }
+
+  // 生成排班表
+  function generateSchedule() {
+    // 获取所有可用时间数据
+    const availabilityData = JSON.parse(localStorage.getItem('allAvailability')) || {};
+
+    if (Object.keys(availabilityData).length === 0) {
+      showNotification('没有可用数据，请先提交可用时间');
+      return;
+    }
+
+    // 定义时间槽和日期
+    const timeSlots = ["8:00-10:00", "10:00-12:00", "14:00-16:00", "16:00-18:00"];
+    const days = ["周一", "周二", "周三", "周四", "周五"];
+
+    // 初始化排班表
+    const schedule = {};
+    days.forEach(day => {
+      schedule[day] = {};
+      timeSlots.forEach(time => {
+        schedule[day][time] = [];
+      });
+    });
+
+    // 简单的排班算法：为每个时间段分配可用的人员
+    days.forEach(day => {
+      timeSlots.forEach(time => {
+        // 找出这个时间段所有可用的人
+        const availablePeople = [];
+        for (const phone in availabilityData) {
+          const person = availabilityData[phone];
+          if (person.availability.some(slot => slot.day === day && slot.time === time)) {
+            availablePeople.push(person.name);
+          }
+        }
+
+        // 简单分配：选择前2个可用的人
+        schedule[day][time] = availablePeople.slice(0, 2);
+      });
+    });
+
+    // 显示排班结果
+    const tableBody = document.querySelector('#schedule-table tbody');
+    tableBody.innerHTML = '';
+
+    timeSlots.forEach(time => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${time}</td>`;
+
+      days.forEach(day => {
+        const people = schedule[day][time].join('、') || '暂无安排';
+        row.innerHTML += `<td>${people}</td>`;
+      });
+
+      tableBody.appendChild(row);
+    });
+
+    showNotification('排班表生成成功！');
+  }
+
+  // 清除所有数据
+  function clearAllData() {
+    if (confirm('确定要清除所有数据吗？此操作不可恢复。')) {
+      localStorage.removeItem('allAvailability');
+      allAvailability = {};
+      document.querySelector('#schedule-table tbody').innerHTML = '';
+      showNotification('所有数据已清除');
+    }
+  }
+</script>
+</body>
+</html>
