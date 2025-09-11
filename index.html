@@ -117,16 +117,34 @@
             justify-content: center;
             border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             font-weight: 500;
+            border: 2px solid transparent;
+            user-select: none;
         }
         .schedule-cell.selected {
             background: #2ecc71;
             color: white;
             font-weight: 600;
+            border-color: #27ae60;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            transform: scale(1.02);
         }
+        /* 移除悬停效果，只保留点击效果 */
         .schedule-cell:hover {
-            background: #bdc3c7;
+            background: #ecf0f1; /* 保持原背景色，不变化 */
+        }
+        .schedule-cell.selected:hover {
+            background: #2ecc71; /* 选中状态下悬停也不变化 */
+        }
+        /* 点击动画效果 */
+        @keyframes cellClick {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        .schedule-cell.click-feedback {
+            animation: cellClick 0.3s ease;
         }
         table {
             width: 100%;
@@ -197,19 +215,37 @@
         .notification.show {
             transform: translateX(0);
         }
+        .notification.error {
+            background: #e74c3c;
+        }
         .loading {
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid #f3f3f3;
+            border: 3px solid #f3f3f7;
             border-top: 3px solid #3498db;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-left: 10px;
         }
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+        }
+        .status-message.success {
+            border-left-color: #2ecc71;
+            background: #e8f5e8;
+        }
+        .status-message.error {
+            border-left-color: #e74c3c;
+            background: #fee;
+        }
         @keyframes spin {
             0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        <a href="/user/100%">100%</a> { transform: rotate(360deg); }
         }
         @media (max-width: 768px) {
             .schedule-grid {
@@ -227,7 +263,7 @@
 <div class="container">
     <header>
         <h1>自动排班系统</h1>
-        <p class="description">填写您的信息并选择可用时间段</p>
+        <p class="description">填写信息并选择可用时间段</p>
     </header>
 
     <div class="tabs">
@@ -249,8 +285,8 @@
         </div>
 
         <div class="card">
-            <h2>选择您的可用时间</h2>
-            <p>请勾选您有空的时间段，提交后数据将保存到GitHub Issue中</p>
+            <h2>选择可用时间</h2>
+            <p>请勾选有空的时间段</p>
 
             <div class="schedule-grid">
                 <div class="time-slot">时间/日期</div>
@@ -289,17 +325,19 @@
                 <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周五">第四节</div>
             </div>
 
-            <button style="margin-top: 20px;" onclick="submitToGitHub()" id="submit-btn">
-                提交到GitHub
+            <button style="margin-top: 20px;" onclick="submitToVercel()" id="submit-btn">
+                提交
             </button>
-            <div id="submit-status" style="margin-top: 10px; color: #666; font-size: 14px;"></div>
+            <div id="submit-status" class="status-message">
+                请填写信息并选择可用时间后提交
+            </div>
         </div>
     </div>
 
     <div id="admin" class="tab-content">
         <div class="card admin-panel">
-            <h2>GitHub数据管理</h2>
-            <p>管理GitHub Issues中的排班数据</p>
+            <h2>数据管理</h2>
+            <p>管理排班数据</p>
 
             <div style="margin: 20px 0;">
                 <button onclick="fetchGitHubIssues()">从GitHub获取数据</button>
@@ -349,25 +387,61 @@
 <script>
     // GitHub仓库配置
     const GITHUB_CONFIG = {
-        owner: grasscake492,      // GitHub用户名
-        repo: duty-program,       // 仓库名
+        owner: 'grasscake492',      // GitHub用户名
+        repo: 'duty-program',       // 仓库名
         labels: ['scheduling', 'submission'] // Issue标签
     };
 
-    // 切换选项卡
-    function switchTab(tabName) {
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    // ==================== 新增的点击反馈函数 ====================
 
-        document.querySelector(`.tab:${tabName === 'user' ? 'first-child' : 'last-child'}`).classList.add('active');
-        document.getElementById(tabName).classList.add('active');
+    // 切换单元格选择状态
+    function toggleCell(cell) {
+        // 切换选中状态
+        cell.classList.toggle('selected');
+
+        // 添加点击动画效果
+        provideClickFeedback(cell);
+    }
+
+    // 提供点击视觉反馈
+    function provideClickFeedback(cell) {
+        // 添加点击动画类
+        cell.classList.add('click-feedback');
+
+        // 300毫秒后移除动画类，以便下次点击可以再次触发
+        setTimeout(() => {
+            cell.classList.remove('click-feedback');
+        }, 300);
+    }
+
+    // 清空表单函数
+    function clearForm() {
+        document.getElementById('name').value = '';
+        document.getElementById('phone').value = '';
+        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
+            cell.classList.remove('selected');
+        });
+        console.log('表单已清空');
+    }
+
+    // 设置提交状态
+    function setSubmitStatus(message, isLoading = false, isError = false) {
+        const statusElement = document.getElementById('submit-status');
+        const submitButton = document.getElementById('submit-btn');
+
+        statusElement.textContent = message;
+        statusElement.className = 'status-message' +
+            (isError ? ' error' : '') +
+            (isLoading ? ' loading' : '');
+
+        submitButton.disabled = isLoading;
     }
 
     // 显示通知
     function showNotification(message, isError = false) {
         const notification = document.getElementById('notification');
         notification.textContent = message;
-        notification.style.background = isError ? '#e74c3c' : '#2ecc71';
+        notification.className = 'notification' + (isError ? ' error' : '');
         notification.classList.add('show');
 
         setTimeout(() => {
@@ -375,25 +449,11 @@
         }, 3000);
     }
 
-    // 切换单元格选择状态
-    function toggleCell(cell) {
-        cell.classList.toggle('selected');
-    }
+    // ==================== 原有的无服务器函数部分 ====================
 
-    // 设置提交状态
-    function setSubmitStatus(message, isLoading = false) {
-        const statusElement = document.getElementById('submit-status');
-        const submitButton = document.getElementById('submit-btn');
-
-        statusElement.innerHTML = isLoading
-            ? `${message} <span class="loading"></span>`
-            : message;
-
-        submitButton.disabled = isLoading;
-    }
-
-    // 提交数据到GitHub Issue
-    async function submitToGitHub() {
+    // 提交数据到Vercel无服务器函数
+    // 提交数据到GitHub Issues
+    async function submitToVercel() {
         const name = document.getElementById('name').value.trim();
         const phone = document.getElementById('phone').value.trim();
 
@@ -420,197 +480,82 @@
             name: name,
             phone: phone,
             availability: availability,
-            timestamp: new Date().toISOString(),
-            submittedAt: new Date().toLocaleString('zh-CN')
+            timestamp: new Date().toISOString()
         };
 
-        setSubmitStatus('正在提交到GitHub...', true);
+        setSubmitStatus('正在提交...', true);
+        document.getElementById('submit-btn').disabled = true;
 
         try {
-            // 创建GitHub Issue
-            const issueResponse = await createGitHubIssue(submissionData);
+            // ==================== 重要修改：直接调用GitHub API ====================
+            const GITHUB_OWNER = 'grasscake492';      // 您的GitHub用户名
+            const GITHUB_REPO = 'duty-program';       // 您的仓库名
+            const GITHUB_TOKEN = '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'; // 需要替换为您的token
 
-            if (issueResponse && issueResponse.html_url) {
-                showNotification('提交成功！数据已保存到GitHub Issue');
-                clearForm();
-                setSubmitStatus(`提交成功！<a href="${issueResponse.html_url}" target="_blank">查看Issue</a>`);
-            } else {
-                throw new Error('创建Issue失败');
+            if (!GITHUB_TOKEN || GITHUB_TOKEN === '您的GitHub个人访问令牌') {
+                throw new Error('请先设置GitHub访问令牌');
             }
-        } catch (error) {
-            console.error('提交失败:', error);
-            showNotification('提交失败，请检查控制台日志', true);
-            setSubmitStatus('提交失败，请重试');
-        }
-    }
 
-    // 创建GitHub Issue
-    async function createGitHubIssue(data) {
-        const issueTitle = `排班提交: ${data.name} (${data.phone})`;
-        const issueBody = `
-## 用户排班信息提交
+            // 构建Issue内容
+            const issueTitle = `排班提交: ${name} (${phone})`;
+            const issueBody = `
+## 排班信息提交
 
-### 基本信息
-- **姓名**: ${data.name}
-- **手机**: ${data.phone}
-- **提交时间**: ${data.submittedAt}
+**姓名:** ${name}
+**手机:** ${phone}
+**提交时间:** ${new Date().toLocaleString('zh-CN')}
 
 ### 可用时间段
-${data.availability.map(slot => `- ${slot.day} ${slot.time}`).join('\n')}
+${availability.map(slot => `- ${slot.day} ${slot.time}`).join('\n')}
 
 ### 原始数据
 \`\`\`json
-${JSON.stringify(data, null, 2)}
+${JSON.stringify(submissionData, null, 2)}
 \`\`\`
+        `.trim();
 
-*由自动排班系统生成*
-            `;
-
-        // 这里使用GitHub REST API
-        // 注意：在实际部署中，你应该使用后端代理或GitHub Actions来处理认证
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/issues`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
-                // 在生产环境中，不应该在前端暴露token
-                // 'Authorization': 'token YOUR_GITHUB_TOKEN'
-            },
-            body: JSON.stringify({
-                title: issueTitle,
-                body: issueBody,
-                labels: GITHUB_CONFIG.labels
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`GitHub API错误: ${response.status}`);
-        }
-
-        return response.json();
-    }
-
-    // 清空表单
-    function clearForm() {
-        document.getElementById('name').value = '';
-        document.getElementById('phone').value = '';
-        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
-            cell.classList.remove('selected');
-        });
-    }
-
-    // 从GitHub获取Issues数据
-    async function fetchGitHubIssues() {
-        try {
-            const response = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/issues?labels=${GITHUB_CONFIG.labels.join(',')}`);
-
-            if (!response.ok) {
-                throw new Error('获取GitHub Issues失败');
-            }
-
-            const issues = await response.json();
-            displayIssuesList(issues);
-            showNotification(`获取到 ${issues.length} 个排班提交`);
-        } catch (error) {
-            console.error('获取数据失败:', error);
-            showNotification('获取数据失败，请检查控制台', true);
-        }
-    }
-
-    // 显示Issues列表
-    function displayIssuesList(issues) {
-        const issuesList = document.getElementById('issues-list');
-
-        if (issues.length === 0) {
-            issuesList.innerHTML = '<p>暂无排班提交数据</p>';
-            return;
-        }
-
-        issuesList.innerHTML = `
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                    <p><strong>找到 ${issues.length} 个排班提交：</strong></p>
-                    <ul style="margin-top: 10px;">
-                        ${issues.map(issue => `
-                            <li style="margin-bottom: 8px;">
-                                <a href="${issue.html_url}" target="_blank" style="color: #0366d6; text-decoration: none;">
-                                    #${issue.number} - ${issue.title}
-                                </a>
-                                <br>
-                                <small style="color: #666;">创建于: ${new Date(issue.created_at).toLocaleString('zh-CN')}</small>
-                            </li>
-                        `).join('')}
-                    </ul>
-                </div>
-            `;
-    }
-
-    // 打开GitHub Issues页面
-    function openGitHubIssues() {
-        window.open(`https://github.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/issues`, '_blank');
-    }
-
-    // 从GitHub数据生成排班表
-    async function generateScheduleFromGitHub() {
-        try {
-            // 这里应该是从GitHub API获取数据并解析的逻辑
-            // 简化版：使用模拟数据
-            showNotification('此功能需要实现GitHub数据解析逻辑');
-
-            // 模拟数据
-            const schedule = {
-                "周一": {
-                    "8:00-10:00": ["张三", "李四"],
-                    "10:00-12:00": ["王五"],
-                    "14:00-16:00": ["张三", "赵六"],
-                    "16:00-18:00": ["李四"]
+            // 直接调用GitHub API
+            const githubResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Scheduling-App'
                 },
-                "周二": {
-                    "8:00-10:00": ["王五", "赵六"],
-                    "10:00-12:00": ["张三"],
-                    "14:00-16:00": ["李四", "王五"],
-                    "16:00-18:00": ["赵六"]
-                }
-            };
-
-            displaySchedule(schedule);
-
-        } catch (error) {
-            console.error('生成排班失败:', error);
-            showNotification('生成排班失败', true);
-        }
-    }
-
-    // 显示排班表
-    function displaySchedule(schedule) {
-        const tableBody = document.querySelector('#schedule-table tbody');
-        const timeSlots = ["8:00-10:00", "10:00-12:00", "14:00-16:00", "16:00-18:00"];
-        const days = ["周一", "周二", "周三", "周四", "周五"];
-
-        tableBody.innerHTML = '';
-
-        timeSlots.forEach(time => {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td>${time}</td>`;
-
-            days.forEach(day => {
-                const people = schedule[day] && schedule[day][time]
-                    ? schedule[day][time].join('、')
-                    : '暂无安排';
-                row.innerHTML += `<td>${people}</td>`;
+                body: JSON.stringify({
+                    title: issueTitle,
+                    body: issueBody,
+                    labels: ['scheduling', 'submission']
+                })
             });
 
-            tableBody.appendChild(row);
-        });
+            console.log('GitHub API响应状态:', githubResponse.status);
 
-        showNotification('排班表生成成功！');
+            if (!githubResponse.ok) {
+                const errorText = await githubResponse.text();
+                console.error('GitHub API错误详情:', errorText);
+                throw new Error(`GitHub API请求失败: ${githubResponse.status}`);
+            }
+
+            const issueData = await githubResponse.json();
+
+            showNotification('提交成功！数据已保存到GitHub Issue');
+            setSubmitStatus('提交成功！Issue已创建', false);
+
+            // 可选：在新标签页打开创建的Issue
+            window.open(issueData.html_url, '_blank');
+
+            clearForm();
+
+        } catch (error) {
+            console.error('提交失败详情:', error);
+            showNotification('提交失败: ' + error.message, true);
+            setSubmitStatus('提交失败: ' + error.message, false, true);
+        } finally {
+            document.getElementById('submit-btn').disabled = false;
+        }
     }
-
-    // 初始化页面
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('自动排班系统已加载');
-        console.log('请记得修改 GITHUB_CONFIG 中的用户名和仓库名');
-        console.log('GitHub配置:', GITHUB_CONFIG);
-    });
 </script>
 </body>
 </html>
