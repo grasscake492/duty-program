@@ -245,8 +245,9 @@
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
-        <a href="/user/100%">100%</a> { transform: rotate(360deg); }
+            100% { transform: rotate(360deg); }
         }
+
         @media (max-width: 768px) {
             .schedule-grid {
                 grid-template-columns: 80px repeat(5, 1fr);
@@ -325,12 +326,11 @@
                 <div class="schedule-cell" onclick="toggleCell(this)" data-time="16:00-18:00" data-day="周五">第四节</div>
             </div>
 
-            <button style="margin-top: 20px;" onclick="submitToVercel()" id="submit-btn">
-                提交
-            </button>
+            <button id="submit-btn">提交排班</button>
             <div id="submit-status" class="status-message">
                 请填写信息并选择可用时间后提交
             </div>
+
         </div>
     </div>
 
@@ -385,30 +385,24 @@
 <div class="notification" id="notification">提交成功！</div>
 
 <script>
-    // GitHub仓库配置
+    // GitHub仓库配置（这些信息可以公开）
     const GITHUB_CONFIG = {
         owner: 'grasscake492',      // GitHub用户名
         repo: 'duty-program',       // 仓库名
         labels: ['scheduling', 'submission'] // Issue标签
     };
 
-    // ==================== 新增的点击反馈函数 ====================
+    // ==================== 工具函数部分 ====================
 
     // 切换单元格选择状态
     function toggleCell(cell) {
-        // 切换选中状态
         cell.classList.toggle('selected');
-
-        // 添加点击动画效果
         provideClickFeedback(cell);
     }
 
     // 提供点击视觉反馈
     function provideClickFeedback(cell) {
-        // 添加点击动画类
         cell.classList.add('click-feedback');
-
-        // 300毫秒后移除动画类，以便下次点击可以再次触发
         setTimeout(() => {
             cell.classList.remove('click-feedback');
         }, 300);
@@ -449,113 +443,145 @@
         }, 3000);
     }
 
-    // ==================== 原有的无服务器函数部分 ====================
+    // ==================== 提交函数部分 ====================
 
-    // 提交数据到Vercel无服务器函数
-    // 提交数据到GitHub Issues
-    async function submitToVercel() {
+    // 验证提交数据
+    function validateSubmissionData(data) {
+        const errors = [];
+
+        if (!data.name || data.name.trim().length < 2) {
+            errors.push('请输入有效的姓名（至少2个字符）');
+        }
+
+        if (!data.phone || !/^1[3-9]\d{9}$/.test(data.phone)) {
+            errors.push('请输入有效的手机号码');
+        }
+
+        if (!data.availability || data.availability.length === 0) {
+            errors.push('请至少选择一个可用时间段');
+        }
+
+        return errors;
+    }
+
+    // 构建提交数据
+    function buildSubmissionData() {
         const name = document.getElementById('name').value.trim();
         const phone = document.getElementById('phone').value.trim();
 
-        if (!name || !phone) {
-            showNotification('请填写姓名和手机号码', true);
-            return;
-        }
-
-        const selectedCells = document.querySelectorAll('.schedule-cell.selected');
-        if (selectedCells.length === 0) {
-            showNotification('请至少选择一个可用时间段', true);
-            return;
-        }
-
+        // 获取选中的时间段
         const availability = [];
-        selectedCells.forEach(cell => {
+        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
             availability.push({
                 day: cell.getAttribute('data-day'),
                 time: cell.getAttribute('data-time')
             });
         });
 
-        const submissionData = {
+        return {
             name: name,
             phone: phone,
             availability: availability,
             timestamp: new Date().toISOString()
         };
+    }
+
+    // 提交数据到自己的后端API
+    // 提交数据到 Vercel 后端 API
+    async function submitToBackend() {
+        const submissionData = buildSubmissionData();
+
+        // 数据验证
+        const validationErrors = validateSubmissionData(submissionData);
+        if (validationErrors.length > 0) {
+            showNotification(validationErrors[0], true);
+            return;
+        }
 
         setSubmitStatus('正在提交...', true);
-        document.getElementById('submit-btn').disabled = true;
 
         try {
-            // ==================== 重要修改：直接调用GitHub API ====================
-            const GITHUB_OWNER = 'grasscake492';      // 您的GitHub用户名
-            const GITHUB_REPO = 'duty-program';       // 您的仓库名
-            const GITHUB_TOKEN = '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'; // 需要替换为您的token
-
-            if (!GITHUB_TOKEN || GITHUB_TOKEN === '您的GitHub个人访问令牌') {
-                throw new Error('请先设置GitHub访问令牌');
-            }
-
-            // 构建Issue内容
-            const issueTitle = `排班提交: ${name} (${phone})`;
-            const issueBody = `
-## 排班信息提交
-
-**姓名:** ${name}
-**手机:** ${phone}
-**提交时间:** ${new Date().toLocaleString('zh-CN')}
-
-### 可用时间段
-${availability.map(slot => `- ${slot.day} ${slot.time}`).join('\n')}
-
-### 原始数据
-\`\`\`json
-${JSON.stringify(submissionData, null, 2)}
-\`\`\`
-        `.trim();
-
-            // 直接调用GitHub API
-            const githubResponse = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`, {
+            const response = await fetch('/api/create-issue', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `token ${GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Scheduling-App'
-                },
-                body: JSON.stringify({
-                    title: issueTitle,
-                    body: issueBody,
-                    labels: ['scheduling', 'submission']
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submissionData)
             });
 
-            console.log('GitHub API响应状态:', githubResponse.status);
+            const result = await response.json();
 
-            if (!githubResponse.ok) {
-                const errorText = await githubResponse.text();
-                console.error('GitHub API错误详情:', errorText);
-                throw new Error(`GitHub API请求失败: ${githubResponse.status}`);
+            if (response.ok && result.success) {
+                showNotification('提交成功！数据已保存到 GitHub Issue');
+                setSubmitStatus('提交成功！', false);
+
+                if (result.issueUrl) {
+                    window.open(result.issueUrl, '_blank'); // 打开 GitHub Issue
+                }
+
+                clearForm();
+            } else {
+                throw new Error(result.error || '提交失败');
             }
-
-            const issueData = await githubResponse.json();
-
-            showNotification('提交成功！数据已保存到GitHub Issue');
-            setSubmitStatus('提交成功！Issue已创建', false);
-
-            // 可选：在新标签页打开创建的Issue
-            window.open(issueData.html_url, '_blank');
-
-            clearForm();
-
         } catch (error) {
-            console.error('提交失败详情:', error);
+            console.error('提交失败:', error);
             showNotification('提交失败: ' + error.message, true);
             setSubmitStatus('提交失败: ' + error.message, false, true);
         } finally {
             document.getElementById('submit-btn').disabled = false;
         }
     }
+
+
+    // ==================== 初始化部分 ====================
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('排班应用已加载');
+
+        // 绑定提交按钮事件
+        const submitButton = document.getElementById('submit-btn');
+        if (submitButton) {
+            submitButton.addEventListener('click', submitToBackend);
+        }
+
+        // 添加回车键提交支持
+        const nameInput = document.getElementById('name');
+        const phoneInput = document.getElementById('phone');
+
+        if (nameInput && phoneInput) {
+            const handleEnterKey = (event) => {
+                if (event.key === 'Enter') {
+                    submitToBackend();
+                }
+            };
+
+            nameInput.addEventListener('keypress', handleEnterKey);
+            phoneInput.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // ==================== 辅助函数（可选） ====================
+
+    // 测试API连通性（开发时使用）
+    async function testAPIConnection() {
+        try {
+            const response = await fetch('/api/create-issue', {
+                method: 'OPTIONS'
+            });
+            console.log('API连通性测试:', response.status);
+            return response.ok;
+        } catch (error) {
+            console.warn('API测试失败:', error);
+            return false;
+        }
+    }
+
+    // 页面加载时测试API
+    window.addEventListener('load', function() {
+        // 开发环境下测试API连通性
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            testAPIConnection();
+        }
+    });
 </script>
 </body>
 </html>
