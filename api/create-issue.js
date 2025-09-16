@@ -1,3 +1,4 @@
+// /api/create-issue.js
 export default async function handler(req, res) {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
@@ -6,24 +7,29 @@ export default async function handler(req, res) {
     try {
         const { GITHUB_OWNER, GITHUB_REPO, GITHUB_LABELS, GITHUB_TOKEN } = process.env;
 
+        // 检查必要环境变量
         if (!GITHUB_OWNER || !GITHUB_REPO || !GITHUB_TOKEN) {
             return res.status(500).json({ error: "GitHub 配置缺失，请检查环境变量" });
         }
 
-        const { name, phone, timeslot } = req.body;
+        // 解构前端提交的数据
+        const { name, phone, availability } = req.body;
 
-        if (!name || !phone || !timeslot) {
-            return res.status(400).json({ error: "缺少必要字段 (name, phone, timeslot)" });
+        if (!name || !phone || !availability || !Array.isArray(availability) || availability.length === 0) {
+            return res.status(400).json({ error: "缺少必要字段 (name, phone, availability)" });
         }
 
-        const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
+        // 将 availability 数组转换为字符串
+        const timeslotStr = availability
+            .map(slot => `${slot.day} ${slot.time}`)
+            .join(", ");
 
-        // 组装 Issue 内容
+        // 组装 GitHub Issue 内容
         const issueBody = `
 **姓名**: ${name}
 **电话**: ${phone}
-**有空时间段**: ${timeslot}
-    `.trim();
+**有空时间段**: ${timeslotStr}
+        `.trim();
 
         const newIssue = {
             title: `排班提交 - ${name}`,
@@ -31,7 +37,8 @@ export default async function handler(req, res) {
             labels: GITHUB_LABELS ? GITHUB_LABELS.split(",").map(l => l.trim()) : ["scheduling"],
         };
 
-        const githubRes = await fetch(url, {
+        // 提交到 GitHub API
+        const githubRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`, {
             method: "POST",
             headers: {
                 "Accept": "application/vnd.github.v3+json",
@@ -47,11 +54,14 @@ export default async function handler(req, res) {
         }
 
         const createdIssue = await githubRes.json();
+
+        // 返回前端使用的字段
         return res.status(200).json({
             success: true,
-            url: createdIssue.html_url,
+            issueUrl: createdIssue.html_url, // 对应前端 window.open(result.issueUrl)
             number: createdIssue.number,
         });
+
     } catch (err) {
         console.error("创建 GitHub Issue 失败:", err);
         return res.status(500).json({ error: "服务器错误" });
