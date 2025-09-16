@@ -340,10 +340,8 @@
             <p>管理排班数据</p>
 
             <div style="margin: 20px 0;">
-                <button onclick="fetchGitHubIssues()">从GitHub获取数据</button>
-                <button onclick="openGitHubIssues()" style="background: #24292e; margin-left: 10px;">
-                    查看GitHub Issues
-                </button>
+                <button onclick="generateScheduleFromGitHub()">生成本周排班表</button>
+                <button id="view-issues-btn" style="background: #24292e; margin-left: 10px;">查看GitHub Issues</button>
             </div>
 
             <div id="github-data">
@@ -355,7 +353,7 @@
 
             <div style="margin-top: 30px;">
                 <h3>生成排班表</h3>
-                <button onclick="generateScheduleFromGitHub()">根据提交数据生成排班</button>
+                <button id="generate-schedule-btn">根据提交数据生成排班</button>
 
                 <div id="schedule-result">
                     <h4 style="margin-top: 20px;">排班结果</h4>
@@ -385,12 +383,15 @@
 <div class="notification" id="notification">提交成功！</div>
 
 <script>
-    // GitHub仓库配置（这些信息可以公开）
-    const GITHUB_CONFIG = {
-        owner: 'grasscake492',      // GitHub用户名
-        repo: 'duty-program',       // 仓库名
-        labels: ['scheduling', 'submission'] // Issue标签
-    };
+    function switchTab(tabId) {
+        // 移除所有 tab active
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        // 激活当前 tab 和内容
+        document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
 
     // ==================== 工具函数部分 ====================
 
@@ -443,6 +444,66 @@
         }, 3000);
     }
 
+    // ==================== 管理员排班表功能 ====================
+    async function generateScheduleFromGitHub(){
+        try{
+            const response = await fetch('/api/fetch-issues'); // 🔹 调用新接口
+            if(!response.ok) throw new Error('拉取数据失败');
+
+            const issues = await response.json();
+
+            // 解析 issue body，提取姓名 + 可用时间
+            const schedule = { 周一:[], 周二:[], 周三:[], 周四:[], 周五:[] };
+            const timeSlots = ["8:00-10:00","10:00-12:00","14:00-16:00","16:00-18:00"];
+
+            issues.forEach(issue=>{
+                const body = issue.body || "";
+                const nameMatch = body.match(/\*\*姓名\*\*: (.+)/);
+                const name = nameMatch ? nameMatch[1].trim() : "未知";
+                const availabilityMatches = body.match(/\*\*有空时间段\*\*:([\s\S]*)/);
+
+                if(availabilityMatches){
+                    const times = availabilityMatches[1].trim().split(/\n|,/).map(t=>t.trim());
+                    times.forEach(t=>{
+                        timeSlots.forEach(slot=>{
+                            if(t.includes(slot)){
+                                const dayMatch = t.match(/周[一二三四五]/);
+                                if(dayMatch){
+                                    const day = dayMatch[0];
+                                    schedule[day].push(`${slot} - ${name}`);
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+
+            // 渲染表格
+            const tableBody = document.querySelector('#schedule-table tbody');
+            tableBody.innerHTML='';
+            timeSlots.forEach(slot=>{
+                const row=document.createElement('tr');
+                const timeCell=document.createElement('td');
+                timeCell.textContent=slot;
+                row.appendChild(timeCell);
+
+                ["周一","周二","周三","周四","周五"].forEach(day=>{
+                    const cell=document.createElement('td');
+                    cell.textContent = schedule[day].filter(s=>s.startsWith(slot)).map(s=>s.split(" - ")[1]).join(", ");
+                    row.appendChild(cell);
+                });
+
+                tableBody.appendChild(row);
+            });
+
+            showNotification('排班表已生成！');
+        }catch(err){
+            console.error(err);
+            showNotification('生成排班表失败: '+err.message,true);
+        }
+    }
+
+
     // ==================== 提交函数部分 ====================
 
     // 验证提交数据
@@ -486,8 +547,8 @@
         };
     }
 
-    // 提交数据到自己的后端API
-    // 提交数据到 Vercel 后端 API
+    // 提交数据到自己的后端A/P/I
+    // 提交数据到 Vercel 后端 A/P/I
     async function submitToBackend() {
         const submissionData = buildSubmissionData();
 
@@ -582,6 +643,35 @@
             testAPIConnection();
         }
     });
+    async function generateScheduleFromGitHub() {
+        try {
+            const response = await fetch('/api/create-issue', { method: 'GET' });
+            if (!response.ok) throw new Error('拉取数据失败');
+
+            const data = await response.json();
+
+            const tableBody = document.querySelector('#schedule-table tbody');
+            tableBody.innerHTML = '';
+
+            const days = ['周一','周二','周三','周四','周五'];
+            const maxRows = Math.max(...days.map(d => data.schedule[d].length));
+
+            for (let i = 0; i < maxRows; i++) {
+                const row = document.createElement('tr');
+                days.forEach(day => {
+                    const cell = document.createElement('td');
+                    cell.textContent = data.schedule[day][i] || '';
+                    row.appendChild(cell);
+                });
+                tableBody.appendChild(row);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('生成排班表失败: ' + err.message);
+        }
+    }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="./js/main.js"></script>
 </body>
 </html>
