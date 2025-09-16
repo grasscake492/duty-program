@@ -10,11 +10,12 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: "GitHub 配置缺失，请检查环境变量" });
         }
 
-        const { name, phone, timeslot } = req.body;
+        const { name, phone, availability } = req.body;
 
-        if (!name || !phone || !timeslot) {
-            return res.status(400).json({ error: "缺少必要字段 (name, phone, timeslot)" });
+        if (!name || !phone || !availability) {
+            return res.status(400).json({ error: "缺少必要字段 (name, phone, availability)" });
         }
+
 
         const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
 
