@@ -16,7 +16,6 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "缺少必要字段 (name, phone, availability)" });
         }
 
-//为什么修改内容传不上去？？？？
         const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
 
         // 组装 Issue 内容
