@@ -385,13 +385,6 @@
 <div class="notification" id="notification">提交成功！</div>
 
 <script>
-    // GitHub仓库配置（这些信息可以公开）
-    const GITHUB_CONFIG = {
-        owner: 'grasscake492',      // GitHub用户名
-        repo: 'duty-program',       // 仓库名
-        labels: ['scheduling', 'submission'] // Issue标签
-    };
-
     // ==================== 工具函数部分 ====================
 
     // 切换单元格选择状态
@@ -443,6 +436,79 @@
         }, 3000);
     }
 
+    // ==================== 管理员排班表功能 ====================
+    async function generateScheduleFromGitHub() {
+        try {
+            // 调用 Vercel 后端 /api/fetch-issues
+            const response = await fetch('/api/fetch-issues', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`拉取数据失败 (${response.status}): ${errorText}`);
+            }
+
+            const issues = await response.json();
+
+            // 初始化排班表结构
+            const schedule = { 周一: [], 周二: [], 周三: [], 周四: [], 周五: [] };
+            const timeSlots = ["8:00-10:00", "10:00-12:00", "14:00-16:00", "16:00-18:00"];
+
+            // 遍历 issue，解析姓名和可用时间
+            issues.forEach(issue => {
+                const body = issue.body || "";
+                const nameMatch = body.match(/\*\*姓名\*\*: (.+)/);
+                const name = nameMatch ? nameMatch[1].trim() : "未知";
+                const availabilityMatches = body.match(/\*\*有空时间段\*\*:([\s\S]*)/);
+
+                if (availabilityMatches) {
+                    const times = availabilityMatches[1].trim().split(/\n|,/).map(t => t.trim());
+                    times.forEach(t => {
+                        timeSlots.forEach(slot => {
+                            if (t.includes(slot)) {
+                                const dayMatch = t.match(/周[一二三四五]/);
+                                if (dayMatch) {
+                                    const day = dayMatch[0];
+                                    schedule[day].push(`${slot} - ${name}`);
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+
+            // 渲染表格
+            const tableBody = document.querySelector('#schedule-table tbody');
+            tableBody.innerHTML = '';
+            timeSlots.forEach(slot => {
+                const row = document.createElement('tr');
+                const timeCell = document.createElement('td');
+                timeCell.textContent = slot;
+                row.appendChild(timeCell);
+
+                ["周一", "周二", "周三", "周四", "周五"].forEach(day => {
+                    const cell = document.createElement('td');
+                    // 只显示姓名，不重复时间
+                    cell.textContent = schedule[day]
+                        .filter(s => s.startsWith(slot))
+                        .map(s => s.split(" - ")[1])
+                        .join(", ");
+                    row.appendChild(cell);
+                });
+
+                tableBody.appendChild(row);
+            });
+
+            showNotification('排班表已生成！');
+        } catch (err) {
+            console.error(err);
+            showNotification('生成排班表失败: ' + err.message, true);
+        }
+    }
+
+
     // ==================== 提交函数部分 ====================
 
     // 验证提交数据
@@ -486,8 +552,8 @@
         };
     }
 
-    // 提交数据到自己的后端API
-    // 提交数据到 Vercel 后端 API
+    // 提交数据到自己的后端A/P/I
+    // 提交数据到 Vercel 后端 A/P/I
     async function submitToBackend() {
         const submissionData = buildSubmissionData();
 
@@ -560,6 +626,14 @@
     });
 
     // ==================== 辅助函数（可选） ====================
+    //增加切换按钮
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+
+        document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
 
     // 测试API连通性（开发时使用）
     async function testAPIConnection() {

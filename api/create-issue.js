@@ -1,54 +1,59 @@
-// api/create-issue.js
 export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Method not allowed" });
     }
 
     try {
-        const { name, phone, availability, time } = req.body;
+        const { GITHUB_OWNER, GITHUB_REPO, GITHUB_LABELS, GITHUB_TOKEN } = process.env;
 
-        if (!name || !phone || !availability || !Array.isArray(availability)) {
-            return res.status(400).json({ error: '提交数据不完整或格式错误' });
+        if (!GITHUB_OWNER || !GITHUB_REPO || !GITHUB_TOKEN) {
+            return res.status(500).json({ error: "GitHub 配置缺失，请检查环境变量" });
         }
 
-        const token = process.env.GITHUB_TOKEN;
-        const owner = "grasscake492";
-        const repo = "duty-program";
+        const { name, phone, timeslot } = req.body;
 
-        const issueTitle = `排班提交 - ${name}`;
+        if (!name || !phone || !timeslot) {
+            return res.status(400).json({ error: "缺少必要字段 (name, phone, timeslot)" });
+        }
+
+        const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
+
+        // 组装 Issue 内容
         const issueBody = `
 **姓名**: ${name}
 **电话**: ${phone}
-**可用时间**:
-${availability.map(t => `- ${t.day} ${t.time}`).join("\n")}
-**提交时间**: ${time}
-    `;
+**有空时间段**: ${timeslot}
+    `.trim();
 
-        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues`, {
-            method: 'POST',
+        const newIssue = {
+            title: `排班提交 - ${name}`,
+            body: issueBody,
+            labels: GITHUB_LABELS ? GITHUB_LABELS.split(",").map(l => l.trim()) : ["scheduling"],
+        };
+
+        const githubRes = await fetch(url, {
+            method: "POST",
             headers: {
-                Authorization: `token ${token}`,
-                Accept: "application/vnd.github+json",
-                'Content-Type': 'application/json'
+                "Accept": "application/vnd.github.v3+json",
+                "Authorization": `token ${GITHUB_TOKEN}`,
+                "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                title: issueTitle,
-                body: issueBody,
-                labels: ["scheduling", "submission"]
-            })
+            body: JSON.stringify(newIssue),
         });
 
-        const result = await response.json();
-
-        if (!response.ok) {
-            console.error("GitHub API错误:", result);
-            return res.status(response.status).json({ error: result.message || 'GitHub API调用失败' });
+        if (!githubRes.ok) {
+            const errorText = await githubRes.text();
+            return res.status(githubRes.status).json({ error: errorText });
         }
 
-        res.status(200).json({ success: true, issueUrl: result.html_url });
-
+        const createdIssue = await githubRes.json();
+        return res.status(200).json({
+            success: true,
+            url: createdIssue.html_url,
+            number: createdIssue.number,
+        });
     } catch (err) {
-        console.error("后端异常:", err);
-        res.status(500).json({ error: err.message });
+        console.error("创建 GitHub Issue 失败:", err);
+        return res.status(500).json({ error: "服务器错误" });
     }
 }

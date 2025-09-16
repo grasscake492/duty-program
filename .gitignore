@@ -1,0 +1,43 @@
+# 依赖目录
+node_modules/
+
+# 日志文件
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 本地环境变量
+.env
+.env.local
+.env.*.local
+
+# Mac 系统文件
+.DS_Store
+
+# Windows 系统文件
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+
+# 构建输出（如果有的话）
+dist/
+build/
+.next/
+out/
+
+# Vercel 本地配置文件（远程部署用 vercel.json 就行）
+.vercel
+
+# 缓存文件
+*.log
+*.tmp
+*.temp
+
+# 可能的图标/本地生成的文件
+*.ico
