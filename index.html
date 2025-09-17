@@ -354,8 +354,10 @@
             </div>
 
             <div style="margin-top: 30px;">
-                <h3>生成排班表</h3>
+                <!--<h3>生成排班表</h3>
                 <button onclick="generateScheduleFromGitHub()">根据提交数据生成排班</button>
+                -->
+                <button id="generate-schedule-btn">生成排班表</button>
 
                 <div id="schedule-result">
                     <h4 style="margin-top: 20px;">排班结果</h4>
@@ -436,78 +438,210 @@
         }, 3000);
     }
 
-    // ==================== 管理员排班表功能 ====================
+    // ==================== 管理员排班表功能（最大化分配、每人最多一次） ====================
     async function generateScheduleFromGitHub() {
         try {
-            // 调用 Vercel 后端 /api/fetch-issues
-            const response = await fetch('/api/fetch-issues', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            });
+            const resp = await fetch('/api/fetch-issues', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+            if (!resp.ok) {
+                const t = await resp.text().catch(()=>'');
+                throw new Error(`拉取数据失败 (${resp.status}) ${t}`);
+            }
+            const issues = await resp.json();
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`拉取数据失败 (${response.status}): ${errorText}`);
+            // 定义时间与天
+            const days = ['周一','周二','周三','周四','周五'];
+            const timeSlots = ['8:00-10:00','10:00-12:00','14:00-16:00','16:00-18:00'];
+
+            // 如果需要不同 slot 容量（每个 slot 最多可分配多少人），在这里调整。
+            // 例如：{ '周一|8:00-10:00': 2 } 表示周一 8-10 允许 2 人同时值班。
+            const slotCapacity = {}; // 默认都为1
+
+            // 解析 issue.body 中的可用时间，返回 [{ id, name, phone, availability: [{day, time}, ...] }, ...]
+            const people = []; // unique persons
+            const personMap = {}; // key -> index in people
+
+            function parseAvailabilityFromBody(body) {
+                if (!body) return [];
+                // 查找 "**有空时间段**:" 后面的内容（如果存在）
+                const match = body.match(/\*\*有空时间段\*\*[:：]\s*([\s\S]*)/i);
+                let payload = match ? match[1] : body; // 如果没有标明字段，就尝试用整个 body
+                // 切分 by comma/newline/；/、 etc
+                const parts = payload.split(/[\n,;；、]+/).map(s => s.trim()).filter(Boolean);
+
+                const result = [];
+                for (const p of parts) {
+                    // 找 day 和 time
+                    const dayMatch = p.match(/周[一二三四五]/);
+                    const timeMatch = p.match(/(?:\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})|(?:8:00-10:00|10:00-12:00|14:00-16:00|16:00-18:00)/);
+                    if (dayMatch && timeMatch) {
+                        const day = dayMatch[0];
+                        // normalize time
+                        const time = timeMatch[0].replace(/\s+/g, '');
+                        // normalize common alternate forms -> our canonical timeSlots if possible
+                        const canonical = timeSlots.find(ts => ts.replace(/\s+/g,'') === time) || time;
+                        result.push({ day, time: canonical });
+                    } else {
+                        // 有可能格式像 "周一 8:00-10:00" 或 "8:00-10:00 周二"，尝试交换匹配
+                        const altDay = p.match(/周[一二三四五]/);
+                        const altTime = p.match(/(?:\d{1,2}:\d{2}-\d{1,2}:\d{2})/);
+                        if (altDay && altTime) {
+                            const day = altDay[0];
+                            const time = altTime[0].replace(/\s+/g,'');
+                            const canonical = timeSlots.find(ts => ts.replace(/\s+/g,'') === time) || time;
+                            result.push({ day, time: canonical });
+                        }
+                    }
+                }
+                return result;
             }
 
-            const issues = await response.json();
+            // 构建人员列表（去重使用 name+phone 作为唯一键）
+            for (const issue of issues) {
+                const body = issue.body || '';
+                const nameMatch = body.match(/\*\*姓名\*\*[:：]\s*(.+)/i);
+                const phoneMatch = body.match(/\*\*电话\*\*[:：]\s*(.+)/i);
 
-            // 初始化排班表结构
-            const schedule = { 周一: [], 周二: [], 周三: [], 周四: [], 周五: [] };
-            const timeSlots = ["8:00-10:00", "10:00-12:00", "14:00-16:00", "16:00-18:00"];
+                const name = nameMatch ? nameMatch[1].split('\n')[0].trim() : (issue.title || '未知');
+                const phone = phoneMatch ? phoneMatch[1].split('\n')[0].trim() : '';
 
-            // 遍历 issue，解析姓名和可用时间
-            issues.forEach(issue => {
-                const body = issue.body || "";
-                const nameMatch = body.match(/\*\*姓名\*\*: (.+)/);
-                const name = nameMatch ? nameMatch[1].trim() : "未知";
-                const availabilityMatches = body.match(/\*\*有空时间段\*\*:([\s\S]*)/);
+                const availability = parseAvailabilityFromBody(body);
+                const key = `${name}||${phone}`; // uniqueness key
 
-                if (availabilityMatches) {
-                    const times = availabilityMatches[1].trim().split(/\n|,/).map(t => t.trim());
-                    times.forEach(t => {
-                        timeSlots.forEach(slot => {
-                            if (t.includes(slot)) {
-                                const dayMatch = t.match(/周[一二三四五]/);
-                                if (dayMatch) {
-                                    const day = dayMatch[0];
-                                    schedule[day].push(`${slot} - ${name}`);
-                                }
-                            }
-                        });
-                    });
+                if (!personMap[key]) {
+                    const idx = people.length;
+                    personMap[key] = idx;
+                    people.push({ id: idx, name, phone, availability });
+                } else {
+                    // 如果同一人多条 issue，合并 availability（去重）
+                    const idx = personMap[key];
+                    const exist = people[idx];
+                    for (const a of availability) {
+                        if (!exist.availability.some(x => x.day === a.day && x.time === a.time)) {
+                            exist.availability.push(a);
+                        }
+                    }
                 }
+            }
+
+            // 构建 slot 列表（"周X|time"）
+            const slots = [];
+            for (const d of days) {
+                for (const t of timeSlots) {
+                    slots.push({ key: `${d}|${t}`, day: d, time: t });
+                }
+            }
+
+            // 构建 bipartite adjacency: personIndex -> array of slotIndices
+            const slotIndexMap = {};
+            slots.forEach((s, i) => slotIndexMap[s.key] = i);
+
+            const adj = Array.from({ length: people.length }, () => []);
+            for (let pi = 0; pi < people.length; pi++) {
+                const person = people[pi];
+                for (const av of person.availability) {
+                    const slotKey = `${av.day}|${av.time}`;
+                    if (slotKey in slotIndexMap) {
+                        adj[pi].push(slotIndexMap[slotKey]);
+                    }
+                }
+            }
+
+            // slot capacity (default 1)
+            const capacities = Array(slots.length).fill(1);
+            for (let i = 0; i < slots.length; i++) {
+                const key = slots[i].key;
+                if (slotCapacity[key]) capacities[i] = slotCapacity[key];
+            }
+
+            // 我们采用"每个人最多1次，每个slot有capacity"的最大匹配
+            // 由于capacity 可能 >1，我们将 slot 节点拆成 capacity 个副本（简单方法）
+            const slotCopies = []; // maps copyIndex -> original slot index
+            for (let s = 0; s < slots.length; s++) {
+                for (let c = 0; c < capacities[s]; c++) {
+                    slotCopies.push(s);
+                }
+            }
+            const copyCount = slotCopies.length;
+
+            // 构建复制后的 adjacency: person -> list of copyIndices they can take
+            const adjCopies = adj.map(arr => {
+                const res = [];
+                for (const slotIdx of arr) {
+                    // 所有副本对应的 copyIndices
+                    for (let copyIdx = 0; copyIdx < copyCount; copyIdx++) {
+                        if (slotCopies[copyIdx] === slotIdx) res.push(copyIdx);
+                    }
+                }
+                return res;
             });
 
-            // 渲染表格
+            // 使用经典的增广路径（DFS）求最大匹配（person -> slotCopy）
+            const matchToCopy = Array(copyCount).fill(-1); // copyIndex -> personIndex
+            const matchPerson = Array(people.length).fill(-1); // personIndex -> copyIndex
+
+            function dfsAug(u, seen) {
+                for (const v of adjCopies[u]) {
+                    if (seen[v]) continue;
+                    seen[v] = true;
+                    if (matchToCopy[v] === -1 || dfsAug(matchToCopy[v], seen)) {
+                        matchToCopy[v] = u;
+                        matchPerson[u] = v;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            let matchCount = 0;
+            for (let u = 0; u < people.length; u++) {
+                const seen = Array(copyCount).fill(false);
+                if (dfsAug(u, seen)) matchCount++;
+            }
+
+            // 根据匹配结果构建最终 schedule: day -> array (per time slot index) -> assigned name (or '')
+            const schedule = {};
+            days.forEach(d => schedule[d] = Array(timeSlots.length).fill(''));
+
+            // for each matched person, note which original slot they were assigned to
+            for (let pi = 0; pi < people.length; pi++) {
+                const copyIdx = matchPerson[pi];
+                if (copyIdx === -1) continue;
+                const originalSlotIdx = slotCopies[copyIdx];
+                const slot = slots[originalSlotIdx]; // {key, day, time}
+                // find timeSlot index
+                const timeIndex = timeSlots.indexOf(slot.time);
+                if (timeIndex >= 0) {
+                    // 如果 slot 已有值，追加（理论上capacity>1时也会分多个副本）
+                    schedule[slot.day][timeIndex] = schedule[slot.day][timeIndex]
+                        ? `${schedule[slot.day][timeIndex]}, ${people[pi].name}`
+                        : `${people[pi].name}`;
+                }
+            }
+
+            // 渲染表格到页面
             const tableBody = document.querySelector('#schedule-table tbody');
             tableBody.innerHTML = '';
-            timeSlots.forEach(slot => {
+
+            for (let ti = 0; ti < timeSlots.length; ti++) {
                 const row = document.createElement('tr');
                 const timeCell = document.createElement('td');
-                timeCell.textContent = slot;
+                timeCell.textContent = timeSlots[ti];
                 row.appendChild(timeCell);
 
-                ["周一", "周二", "周三", "周四", "周五"].forEach(day => {
+                for (const d of days) {
                     const cell = document.createElement('td');
-                    // 只显示姓名，不重复时间
-                    cell.textContent = schedule[day]
-                        .filter(s => s.startsWith(slot))
-                        .map(s => s.split(" - ")[1])
-                        .join(", ");
+                    cell.textContent = schedule[d][ti] || '';
                     row.appendChild(cell);
-                });
-
+                }
                 tableBody.appendChild(row);
-            });
+            }
 
-            showNotification('排班表已生成！');
+            showNotification(`已生成排班：总分配 ${matchCount} 人`);
         } catch (err) {
             console.error(err);
             showNotification('生成排班表失败: ' + err.message, true);
         }
     }
-
 
     // ==================== 提交函数部分 ====================
 
