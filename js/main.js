@@ -126,8 +126,9 @@ async function viewIssues() {
 }
 
 // ==================== 模板读取 ====================
-async function loadTemplate(url) {
-    const response = await fetch(url);
+async function loadTemplate() {
+    const response = await fetch('/schedule_template.xlsx');
+    if (!response.ok) throw new Error('模板文件加载失败');
     const arrayBuffer = await response.arrayBuffer();
     return XLSX.read(arrayBuffer, { type: 'array' });
 }
@@ -206,9 +207,7 @@ async function generateScheduleFromGitHub() {
 
         showNotification('排班表生成成功！');
 
-        // 使用模板导出 Excel
-        const templateUrl = '/schedule_template.xlsx';
-        const workbook = await loadTemplate(templateUrl);
+        const workbook = await loadTemplate();
         exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
 
     } catch (err) {
@@ -221,12 +220,12 @@ async function generateScheduleFromGitHub() {
 function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
     const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-    // 下一周日期写入模板 B1
+    // 下一周日期写入模板 B3
     const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
     ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
 
-    // 映射表：每一天对应的单元格数组
+    // 映射表：每一天对应的单元格数组（只写左上角单元格）
     const cellMapping = {
         '星期一': ['B6','B8','B11','B13'],
         '星期二': ['D6','D8','D11','D13'],
@@ -235,40 +234,16 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
         '星期五': ['D17','D19','D22','D24']
     };
 
-    // 每天时间段对应映射单元格
-    // 假设 timeSlots 数组长度为 4：['8:00-10:00','10:00-12:00','14:00-16:00','16:00-18:00']
-    // 每个时间段占两行，所以每一天的单元格顺序就是 cellMapping[day] 顺序
     for (const day of days) {
         const cells = cellMapping[day];
         if (!cells) continue;
 
-        // 排班数据按时间段顺序填入单元格
-        // 假设 schedule[day] 长度为 4，对应4个时间段
-        // 每个时间段占两行，循环填充
         for (let i = 0; i < schedule[day].length; i++) {
             const value = schedule[day][i] || '';
-            const firstCell = cells[i * 2];
-            const secondCell = cells[i * 2 + 1];
-
+            const firstCell = cells[i]; // 只写左上角
             if (firstCell) ws[firstCell] = { t: 's', v: value };
-            if (secondCell) ws[secondCell] = { t: 's', v: value };
         }
     }
 
     // 保存文件
-    const filename = `新闻嗅觉图片社值班表.xlsx`;
-    XLSX.writeFile(workbook, filename);
-}
-
-
-// ==================== 初始化 ====================
-document.addEventListener('DOMContentLoaded', () => {
-    const submitBtn = document.getElementById('submit-btn');
-    if (submitBtn) submitBtn.addEventListener('click', submitToBackend);
-
-    const viewIssuesBtn = document.getElementById('view-issues-btn');
-    if (viewIssuesBtn) viewIssuesBtn.addEventListener('click', viewIssues);
-
-    const generateBtn = document.getElementById('generate-schedule-btn');
-    if (generateBtn) generateBtn.addEventListener('click', generateScheduleFromGitHub);
-});
+    const filename = `新闻嗅觉图片社x月x日 第x周值班表.xlsx`;}
