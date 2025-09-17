@@ -1,5 +1,4 @@
 // ==================== GitHub 配置 ====================
-// 前端不保存 token，交由后端 API 处理
 const GITHUB_CONFIG = {
     owner: 'grasscake492',
     repo: 'duty-program',
@@ -7,8 +6,6 @@ const GITHUB_CONFIG = {
 };
 
 // ==================== 工具函数 ====================
-
-// 获取下一周时间范围（周一到周五）
 function getNextWeekRange() {
     const now = new Date();
     const day = now.getDay(); // 0=周日,1=周一
@@ -24,14 +21,6 @@ function getNextWeekRange() {
     return { monday, friday };
 }
 
-// 获取当前是今年的第几周
-function getWeekNumber(date) {
-    const firstDay = new Date(date.getFullYear(), 0, 1);
-    const pastDays = Math.floor((date - firstDay) / 86400000);
-    return Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
-}
-
-// 显示通知
 function showNotification(message, isError = false) {
     const notification = document.getElementById('notification');
     notification.textContent = message;
@@ -40,7 +29,6 @@ function showNotification(message, isError = false) {
     setTimeout(() => notification.classList.remove('show'), 3000);
 }
 
-// 构建提交数据
 function buildSubmissionData() {
     const name = document.getElementById('name').value.trim();
     const phone = document.getElementById('phone').value.trim();
@@ -56,7 +44,6 @@ function buildSubmissionData() {
     return { name, phone, availability, timestamp: new Date().toISOString() };
 }
 
-// 验证提交数据
 function validateSubmissionData(data) {
     const errors = [];
     if (!data.name || data.name.length < 2) errors.push('请输入有效的姓名（至少2个字符）');
@@ -65,7 +52,6 @@ function validateSubmissionData(data) {
     return errors;
 }
 
-// 清空表单
 function clearForm() {
     document.getElementById('name').value = '';
     document.getElementById('phone').value = '';
@@ -94,7 +80,7 @@ async function submitToBackend() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            showNotification('提交成功！数据已保存到 GitHub Issue');
+            showNotification('提交成功！数据已保存');
             clearForm();
             if (result.issueUrl) window.open(result.issueUrl, '_blank');
         } else {
@@ -139,6 +125,13 @@ async function viewIssues() {
     }
 }
 
+// ==================== 模板读取 ====================
+async function loadTemplate(url) {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    return XLSX.read(arrayBuffer, { type: 'array' });
+}
+
 // ==================== 排班生成 ====================
 async function generateScheduleFromGitHub() {
     const tableBody = document.querySelector('#schedule-table tbody');
@@ -158,16 +151,14 @@ async function generateScheduleFromGitHub() {
             }
         });
 
-        const days = ['周一','周二','周三','周四','周五'];
-        const timeSlots = ['8:00-10:00','10:00-12:00','14:00-16:00','16:00-18:00'];
+        const days = ['星期一','星期二','星期三','星期四','星期五'];
+        const timeSlots = ['一二节','三四节','五六节','七八节'];
 
         const schedule = {};
         days.forEach(day => schedule[day] = Array(timeSlots.length).fill(''));
 
-        // 记录已排班的人员，保证一周只排一次
         const assignedPeople = new Set();
 
-        // 优先安排人数较少的时间段
         for (const issue of thisWeekIssues) {
             const data = JSON.parse(issue.body);
             const name = data.name || '';
@@ -189,9 +180,7 @@ async function generateScheduleFromGitHub() {
                 return false;
             });
 
-            if (!placed) {
-                console.warn(`未能排班: ${name}`);
-            }
+            if (!placed) console.warn(`未能排班: ${name}`);
         }
 
         // 渲染表格
@@ -209,14 +198,18 @@ async function generateScheduleFromGitHub() {
             });
 
             const signCell = document.createElement('td');
-            signCell.textContent = ''; // 签到列留空
+            signCell.textContent = '';
             row.appendChild(signCell);
 
             tableBody.appendChild(row);
         }
 
         showNotification('排班表生成成功！');
-        exportScheduleToExcel(schedule, timeSlots, days, monday, friday);
+
+        // 使用模板导出 Excel
+        const templateUrl = '/schedule_template.xlsx';
+        const workbook = await loadTemplate(templateUrl);
+        exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
 
     } catch (err) {
         console.error(err);
@@ -224,40 +217,49 @@ async function generateScheduleFromGitHub() {
     }
 }
 
-// ==================== Excel 导出 ====================
-function exportScheduleToExcel(schedule, timeSlots, days, monday, friday) {
-    const wb = XLSX.utils.book_new();
-    const ws_data = [];
+// ==================== Excel 导出（模板版，自动写日期） ====================
+function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
+    const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-    // 标题
-    const weekNum = getWeekNumber(monday);
-    const title = `新闻嗅觉图片社第${weekNum}周值班（${monday.getFullYear()}年${monday.getMonth()+1}月${monday.getDate()}日-${friday.getMonth()+1}月${friday.getDate()}日）`;
-    ws_data.push([title]);
-    ws_data.push([]);
+    // 下一周日期写入模板 B1
+    const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
+    const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
+    ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
 
-    // 表头
-    ws_data.push(['时间/日期', ...days, '签到']);
+    // 映射表：每一天对应的单元格数组
+    const cellMapping = {
+        '星期一': ['B6','B8','B11','B13'],
+        '星期二': ['D6','D8','D11','D13'],
+        '星期三': ['F6','F8','F11','F13'],
+        '星期四': ['B17','B19','B22','B24'],
+        '星期五': ['D17','D19','D22','D24']
+    };
 
-    // 表格内容
-    for (let i = 0; i < timeSlots.length; i++) {
-        const row = [timeSlots[i]];
-        days.forEach(day => row.push(schedule[day][i] || ''));
-        row.push(''); // 签到列
-        ws_data.push(row);
+    // 每天时间段对应映射单元格
+    // 假设 timeSlots 数组长度为 4：['8:00-10:00','10:00-12:00','14:00-16:00','16:00-18:00']
+    // 每个时间段占两行，所以每一天的单元格顺序就是 cellMapping[day] 顺序
+    for (const day of days) {
+        const cells = cellMapping[day];
+        if (!cells) continue;
+
+        // 排班数据按时间段顺序填入单元格
+        // 假设 schedule[day] 长度为 4，对应4个时间段
+        // 每个时间段占两行，循环填充
+        for (let i = 0; i < schedule[day].length; i++) {
+            const value = schedule[day][i] || '';
+            const firstCell = cells[i * 2];
+            const secondCell = cells[i * 2 + 1];
+
+            if (firstCell) ws[firstCell] = { t: 's', v: value };
+            if (secondCell) ws[secondCell] = { t: 's', v: value };
+        }
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    XLSX.utils.book_append_sheet(wb, ws, '排班表');
-
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: "application/octet-stream" });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${title}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // 保存文件
+    const filename = `新闻嗅觉图片社值班表.xlsx`;
+    XLSX.writeFile(workbook, filename);
 }
+
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', () => {
