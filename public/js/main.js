@@ -264,18 +264,32 @@ async function generateScheduleFromGitHub() {
     }
 }
 
-// ==================== Excel 导出（模板版，保留样式） ====================
-const ExcelJS = require('exceljs');
+function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
+    const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-async function exportScheduleWithTemplate(schedule, timeSlots, days, startDate, endDate) {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile('schedule_template.xlsx'); // 读取模板
-    const ws = workbook.getWorksheet(1);
+    // 设置列宽：假设签到列宽为10，则姓名电话列宽设为20
+    // 根据原模板列位置调整，这里示例：
+    ws['!cols'] = [
+        { wch: 10 }, // A 列 - 时间
+        { wch: 20 }, // B 列 - 星期一姓名/电话
+        { wch: 10 }, // C 列 - 可能的签到列
+        { wch: 20 }, // D 列 - 星期二姓名/电话
+        { wch: 10 }, // E 列 - 签到
+        { wch: 20 }, // F 列 - 星期三姓名/电话
+        { wch: 10 }, // G 列 - 签到
+        // 继续根据模板添加列宽
+    ];
 
-    // 写日期
-    ws.getCell('B3').value = `${startDate.getFullYear()}年${startDate.getMonth()+1}月${startDate.getDate()}日 - ${endDate.getMonth()+1}月${endDate.getDate()}日`;
+    // 下一周日期写入模板 B3
+    const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
+    const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
+    if (ws['B3']) {
+        ws['B3'].v = `${startStr}-${endStr}`;   // ✅ 只改值，不覆盖样式
+    } else {
+        ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
+    }
 
-    // 写排班（只改值，样式保留）
+    // 映射表：每一天对应的单元格数组（只写左上角单元格）
     const cellMapping = {
         '星期一': ['B6','B8','B11','B13'],
         '星期二': ['D6','D8','D11','D13'],
@@ -289,10 +303,20 @@ async function exportScheduleWithTemplate(schedule, timeSlots, days, startDate, 
         if (!cells) continue;
 
         for (let i = 0; i < schedule[day].length; i++) {
-            ws.getCell(cells[i]).value = schedule[day][i] || '';
+            const value = schedule[day][i] || '';
+            const firstCell = cells[i]; // 只写左上角
+            if (firstCell) {
+                if (ws[firstCell]) {
+                    ws[firstCell].v = value;   // 只改值，保留边框/横线/样式
+                } else {
+                    ws[firstCell] = { t: 's', v: value };
+                }
+            }
         }
     }
 
-    await workbook.xlsx.writeFile('排班表.xlsx');
+    // 保存文件
+    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
+    console.log("导出 Excel 文件:", filename);
+    XLSX.writeFile(workbook, filename);
 }
-
