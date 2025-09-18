@@ -6,6 +6,8 @@ const GITHUB_CONFIG = {
 };
 
 // ==================== 工具函数 ====================
+
+// 下周范围（周一到周五）
 function getNextWeekRange() {
     const now = new Date();
     const day = now.getDay(); // 0=周日,1=周一
@@ -21,21 +23,18 @@ function getNextWeekRange() {
     return { monday, friday };
 }
 
-function getLastWeekRange() {
+// 本周周一 00:00:00
+function getThisWeekStart() {
     const now = new Date();
-    const day = now.getDay(); // 0=周日, 1=周一...
+    const day = now.getDay(); // 0=周日,1=周一...
     const diffToMonday = (day === 0 ? -6 : 1 - day);
-    const lastMonday = new Date(now);
-    lastMonday.setDate(now.getDate() + diffToMonday - 7);
-    lastMonday.setHours(0,0,0,0);
-
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
-    lastSunday.setHours(23,59,59,999);
-
-    return { lastMonday, lastSunday };
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
 }
 
+// UI 通知
 function showNotification(message, isError = false) {
     const notification = document.getElementById('notification');
     notification.textContent = message;
@@ -44,6 +43,7 @@ function showNotification(message, isError = false) {
     setTimeout(() => notification.classList.remove('show'), 3000);
 }
 
+// 构建提交数据
 function buildSubmissionData() {
     const name = document.getElementById('name').value.trim();
     const phone = document.getElementById('phone').value.trim();
@@ -61,6 +61,7 @@ function buildSubmissionData() {
     return submission;
 }
 
+// 校验数据
 function validateSubmissionData(data) {
     const errors = [];
     if (!data.name || data.name.length < 2) errors.push('请输入有效的姓名（至少2个字符）');
@@ -69,6 +70,7 @@ function validateSubmissionData(data) {
     return errors;
 }
 
+// 清空表单
 function clearForm() {
     document.getElementById('name').value = '';
     document.getElementById('phone').value = '';
@@ -122,19 +124,42 @@ async function fetchGitHubIssues() {
     return data;
 }
 
+// ==================== 过滤函数 ====================
+// 只保留本周提交的数据（剔除所有本周之前提交的）
+function filterThisWeekIssues(issues) {
+    const weekStart = getThisWeekStart();
+    console.log("本周周一开始时间:", weekStart);
+
+    return issues.filter(issue => {
+        try {
+            const data = JSON.parse(issue.body);
+            const ts = new Date(data.timestamp);
+            const keep = ts >= weekStart;
+            console.log(`过滤 issue ${issue.id} 时间:`, ts, "是否保留:", keep);
+            return keep;
+        } catch (err) {
+            console.warn("解析 issue.body 失败:", issue.body);
+            return false;
+        }
+    });
+}
+
+// ==================== 查看 Issues ====================
 async function viewIssues() {
     try {
         const issues = await fetchGitHubIssues();
+        const thisWeekIssues = filterThisWeekIssues(issues);
+
         const container = document.getElementById('issues-list');
         container.innerHTML = '';
 
-        if (issues.length === 0) {
-            container.textContent = '暂无提交记录';
+        if (thisWeekIssues.length === 0) {
+            container.textContent = '本周暂无提交记录';
             return;
         }
 
         const list = document.createElement('ul');
-        issues.forEach(issue => {
+        thisWeekIssues.forEach(issue => {
             const li = document.createElement('li');
             li.innerHTML = `<a href="${issue.html_url}" target="_blank">${issue.title}</a> - ${issue.created_at}`;
             list.appendChild(li);
@@ -161,20 +186,7 @@ async function generateScheduleFromGitHub() {
 
     try {
         const issues = await fetchGitHubIssues();
-        const { lastMonday, lastSunday } = getLastWeekRange();
-
-        const thisWeekIssues = issues.filter(issue => {
-            try {
-                const data = JSON.parse(issue.body);
-                const ts = new Date(data.timestamp);
-                // 只要不是上周提交的数据，就保留
-                return ts > lastSunday;
-            } catch {
-                return false;
-            }
-        });
-
-
+        const thisWeekIssues = filterThisWeekIssues(issues);
         console.log("本周 issues 数:", thisWeekIssues.length);
 
         const days = ['星期一','星期二','星期三','星期四','星期五'];
@@ -242,6 +254,7 @@ async function generateScheduleFromGitHub() {
 
         showNotification('排班表生成成功！');
 
+        const { monday, friday } = getNextWeekRange();
         const workbook = await loadTemplate();
         exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
 
@@ -260,7 +273,7 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
     ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
 
-    // 映射表：每一天对应的单元格数组（只写左上角单元格）
+    // 映射表
     const cellMapping = {
         '星期一': ['B6','B8','B11','B13'],
         '星期二': ['D6','D8','D11','D13'],
@@ -275,12 +288,11 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
 
         for (let i = 0; i < schedule[day].length; i++) {
             const value = schedule[day][i] || '';
-            const firstCell = cells[i]; // 只写左上角
+            const firstCell = cells[i];
             if (firstCell) ws[firstCell] = { t: 's', v: value };
         }
     }
 
-    // 保存文件
     const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
     console.log("导出 Excel 文件:", filename);
     XLSX.writeFile(workbook, filename);
