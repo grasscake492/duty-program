@@ -263,7 +263,7 @@
 <body>
 <div class="container">
     <header>
-        <h1>自动排班系统</h1>
+        <h1>图片社自动排班系统</h1>
         <p class="description">填写信息并选择可用时间段</p>
     </header>
 
@@ -341,17 +341,8 @@
 
             <div style="margin: 20px 0;">
                 <button onclick="generateScheduleFromGitHub()">从GitHub获取数据</button>
-                <button onclick="openGitHubIssues()" style="background: #24292e; margin-left: 10px;">
-                    查看GitHub Issues
-                </button>
             </div>
 
-            <div id="github-data">
-                <h3>GitHub Issues数据</h3>
-                <div id="issues-list" style="margin-top: 15px;">
-                    <p>点击"获取数据"加载提交记录列表</p>
-                </div>
-            </div>
 
             <div style="margin-top: 30px;">
                 <!--<h3>生成排班表</h3>
@@ -650,15 +641,15 @@
         const errors = [];
 
         if (!data.name || data.name.trim().length < 2) {
-            errors.push('请输入有效的姓名（至少2个字符）');
+            errors.push('输入有效的姓名(必须多于两个字符) :D');
         }
 
         if (!data.phone || !/^1[3-9]\d{9}$/.test(data.phone)) {
-            errors.push('请输入有效的手机号码');
+            errors.push('输入正确的手机号码');
         }
 
         if (!data.availability || data.availability.length === 0) {
-            errors.push('请至少选择一个可用时间段');
+            errors.push('请至少选择一个可用时间段（不想值班可以不填表的……）');
         }
 
         return errors;
@@ -710,7 +701,7 @@
             const result = await response.json();
 
             if (response.ok && result.success) {
-                showNotification('提交成功！数据已保存到 GitHub Issue');
+                showNotification('提交成功！');
                 setSubmitStatus('提交成功！', false);
 
                 if (result.issueUrl) {
@@ -719,7 +710,7 @@
 
                 clearForm();
             } else {
-                throw new Error(result.error || '提交失败');
+                throw new Error(result.error || '提交失败，请联系492');
             }
         } catch (error) {
             console.error('提交失败:', error);
@@ -735,7 +726,7 @@
 
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('排班应用已加载');
+        console.log('排班系统已加载');
 
         // 绑定提交按钮事件
         const submitButton = document.getElementById('submit-btn');
