@@ -21,6 +21,21 @@ function getNextWeekRange() {
     return { monday, friday };
 }
 
+function getLastWeekRange() {
+    const now = new Date();
+    const day = now.getDay(); // 0=周日, 1=周一...
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const lastMonday = new Date(now);
+    lastMonday.setDate(now.getDate() + diffToMonday - 7);
+    lastMonday.setHours(0,0,0,0);
+
+    const lastSunday = new Date(lastMonday);
+    lastSunday.setDate(lastMonday.getDate() + 6);
+    lastSunday.setHours(23,59,59,999);
+
+    return { lastMonday, lastSunday };
+}
+
 function showNotification(message, isError = false) {
     const notification = document.getElementById('notification');
     notification.textContent = message;
@@ -146,19 +161,19 @@ async function generateScheduleFromGitHub() {
 
     try {
         const issues = await fetchGitHubIssues();
-        const { monday, friday } = getNextWeekRange();
-
-        console.log("时间范围:", monday, "~", friday);
+        const { lastMonday, lastSunday } = getLastWeekRange();
 
         const thisWeekIssues = issues.filter(issue => {
             try {
                 const data = JSON.parse(issue.body);
                 const ts = new Date(data.timestamp);
-                return ts >= monday && ts <= friday;
+                // 只要不是上周提交的数据，就保留
+                return ts > lastSunday;
             } catch {
                 return false;
             }
         });
+
 
         console.log("本周 issues 数:", thisWeekIssues.length);
 
