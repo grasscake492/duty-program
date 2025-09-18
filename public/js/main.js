@@ -12,11 +12,11 @@ function getNextWeekRange() {
     const diffToMonday = (day === 0 ? 1 : 8 - day);
     const monday = new Date(now);
     monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0,0,0,0);
+    monday.setHours(0, 0, 0, 0);
 
     const friday = new Date(monday);
     friday.setDate(monday.getDate() + 4);
-    friday.setHours(23,59,59,999);
+    friday.setHours(23, 59, 59, 999);
 
     return { monday, friday };
 }
@@ -41,7 +41,9 @@ function buildSubmissionData() {
         });
     });
 
-    return { name, phone, availability, timestamp: new Date().toISOString() };
+    const submission = { name, phone, availability, timestamp: new Date().toISOString() };
+    console.log("构建的提交数据:", submission);
+    return submission;
 }
 
 function validateSubmissionData(data) {
@@ -78,6 +80,7 @@ async function submitToBackend() {
         });
 
         const result = await response.json();
+        console.log("提交结果:", result);
 
         if (response.ok && result.success) {
             showNotification('提交成功！数据已保存');
@@ -99,7 +102,9 @@ async function fetchGitHubIssues() {
     console.log("fetchGitHubIssues 被调用了");
     const response = await fetch('/api/fetch-issues');
     if (!response.ok) throw new Error('拉取 GitHub Issues 失败');
-    return await response.json();
+    const data = await response.json();
+    console.log("拉取到的 issues:", data);
+    return data;
 }
 
 async function viewIssues() {
@@ -143,6 +148,8 @@ async function generateScheduleFromGitHub() {
         const issues = await fetchGitHubIssues();
         const { monday, friday } = getNextWeekRange();
 
+        console.log("时间范围:", monday, "~", friday);
+
         const thisWeekIssues = issues.filter(issue => {
             try {
                 const data = JSON.parse(issue.body);
@@ -153,6 +160,8 @@ async function generateScheduleFromGitHub() {
             }
         });
 
+        console.log("本周 issues 数:", thisWeekIssues.length);
+
         const days = ['星期一','星期二','星期三','星期四','星期五'];
         const timeSlots = ['一二节','三四节','五六节','七八节'];
 
@@ -162,28 +171,38 @@ async function generateScheduleFromGitHub() {
         const assignedPeople = new Set();
 
         for (const issue of thisWeekIssues) {
-            const data = JSON.parse(issue.body);
-            const name = data.name || '';
-            const phone = data.phone || '';
-            const availability = data.availability || [];
+            try {
+                const data = JSON.parse(issue.body);
+                const name = data.name || '';
+                const phone = data.phone || '';
+                const availability = data.availability || [];
 
-            if (assignedPeople.has(name)) continue;
+                console.log(`处理 issue: ${name}`, availability);
 
-            let placed = false;
-            availability.some(slot => {
-                const dayIndex = days.indexOf(slot.day);
-                const timeIndex = timeSlots.indexOf(slot.time);
-                if (dayIndex >= 0 && timeIndex >= 0 && !schedule[slot.day][timeIndex]) {
-                    schedule[slot.day][timeIndex] = `${name}（${phone}）`;
-                    assignedPeople.add(name);
-                    placed = true;
-                    return true;
-                }
-                return false;
-            });
+                if (assignedPeople.has(name)) continue;
 
-            if (!placed) console.warn(`未能排班: ${name}`);
+                let placed = false;
+                availability.some(slot => {
+                    const dayIndex = days.indexOf(slot.day);
+                    const timeIndex = timeSlots.indexOf(slot.time);
+                    console.log("匹配 slot:", slot, "dayIndex:", dayIndex, "timeIndex:", timeIndex);
+
+                    if (dayIndex >= 0 && timeIndex >= 0 && !schedule[slot.day][timeIndex]) {
+                        schedule[slot.day][timeIndex] = `${name}（${phone}）`;
+                        assignedPeople.add(name);
+                        placed = true;
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (!placed) console.warn(`未能排班: ${name}`);
+            } catch (err) {
+                console.warn("解析 issue.body 失败:", issue.body);
+            }
         }
+
+        console.log("最终生成的 schedule:", schedule);
 
         // 渲染表格
         tableBody.innerHTML = '';
@@ -247,4 +266,7 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
     }
 
     // 保存文件
-    const filename = `新闻嗅觉图片社x月x日 第x周值班表.xlsx`;}
+    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
+    console.log("导出 Excel 文件:", filename);
+    XLSX.writeFile(workbook, filename);
+}
