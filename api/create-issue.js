@@ -19,17 +19,13 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "缺少必要字段 (name, phone, availability)" });
         }
 
-        // 将 availability 数组转换为字符串
-        const timeslotStr = availability
-            .map(slot => `${slot.day} ${slot.time}`)
-            .join(", ");
-
-        // 组装 GitHub Issue 内容
-        const issueBody = `
-**姓名**: ${name}
-**电话**: ${phone}
-**有空时间段**: ${timeslotStr}
-        `.trim();
+        // === 关键改动：直接保存 JSON 格式，保持和前端一致 ===
+        const issueBody = JSON.stringify({
+            name,
+            phone,
+            availability,                 // 保持数组形式
+            timestamp: new Date().toISOString()  // 前端生成表格时会用到
+        });
 
         const newIssue = {
             title: `排班提交 - ${name}`,
