@@ -96,6 +96,7 @@ async function submitToBackend() {
 
 // ==================== GitHub 数据操作 ====================
 async function fetchGitHubIssues() {
+    console.log("fetchGitHubIssues 被调用了");
     const response = await fetch('/api/fetch-issues');
     if (!response.ok) throw new Error('拉取 GitHub Issues 失败');
     return await response.json();
