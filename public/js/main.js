@@ -264,16 +264,20 @@ async function generateScheduleFromGitHub() {
     }
 }
 
-// ==================== Excel 导出（模板版，自动写日期） ====================
+// ==================== Excel 导出（模板版，保留样式） ====================
 function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
     const ws = workbook.Sheets[workbook.SheetNames[0]];
 
     // 下一周日期写入模板 B3
     const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
-    ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
+    if (ws['B3']) {
+        ws['B3'].v = `${startStr}-${endStr}`;   // ✅ 只改值，不覆盖样式
+    } else {
+        ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
+    }
 
-    // 映射表
+    // 映射表：每一天对应的单元格数组（只写左上角单元格）
     const cellMapping = {
         '星期一': ['B6','B8','B11','B13'],
         '星期二': ['D6','D8','D11','D13'],
@@ -288,12 +292,20 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
 
         for (let i = 0; i < schedule[day].length; i++) {
             const value = schedule[day][i] || '';
-            const firstCell = cells[i];
-            if (firstCell) ws[firstCell] = { t: 's', v: value };
+            const firstCell = cells[i]; // 只写左上角
+            if (firstCell) {
+                if (ws[firstCell]) {
+                    ws[firstCell].v = value;   // ✅ 只改值，保留边框/横线/样式
+                } else {
+                    ws[firstCell] = { t: 's', v: value };
+                }
+            }
         }
     }
 
+    // 保存文件
     const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
     console.log("导出 Excel 文件:", filename);
     XLSX.writeFile(workbook, filename);
 }
+
