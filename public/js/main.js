@@ -180,143 +180,105 @@ async function loadTemplate() {
 }
 
 // ==================== 排班生成 ====================
-async function generateScheduleFromGitHub() {
-    const tableBody = document.querySelector('#schedule-table tbody');
-    tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
-
-    try {
-        const issues = await fetchGitHubIssues();
-        const thisWeekIssues = filterThisWeekIssues(issues);
-        console.log("本周 issues 数:", thisWeekIssues.length);
-
-        const days = ['星期一','星期二','星期三','星期四','星期五'];
-        const timeSlots = ['一二节','三四节','五六节','七八节'];
-
-        const schedule = {};
-        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(''));
-
-        const assignedPeople = new Set();
-
-        for (const issue of thisWeekIssues) {
-            try {
-                const data = JSON.parse(issue.body);
-                const name = data.name || '';
-                const phone = data.phone || '';
-                const availability = data.availability || [];
-
-                console.log(`处理 issue: ${name}`, availability);
-
-                if (assignedPeople.has(name)) continue;
-
-                let placed = false;
-                availability.some(slot => {
-                    const dayIndex = days.indexOf(slot.day);
-                    const timeIndex = timeSlots.indexOf(slot.time);
-                    console.log("匹配 slot:", slot, "dayIndex:", dayIndex, "timeIndex:", timeIndex);
-
-                    if (dayIndex >= 0 && timeIndex >= 0 && !schedule[slot.day][timeIndex]) {
-                        schedule[slot.day][timeIndex] = `${name}（${phone}）`;
-                        assignedPeople.add(name);
-                        placed = true;
-                        return true;
-                    }
-                    return false;
-                });
-
-                if (!placed) console.warn(`未能排班: ${name}`);
-            } catch (err) {
-                console.warn("解析 issue.body 失败:", issue.body);
-            }
-        }
-
-        console.log("最终生成的 schedule:", schedule);
-
-        // 渲染表格
-        tableBody.innerHTML = '';
-        for (let i = 0; i < timeSlots.length; i++) {
-            const row = document.createElement('tr');
-            const timeCell = document.createElement('td');
-            timeCell.textContent = timeSlots[i];
-            row.appendChild(timeCell);
-
-            days.forEach(day => {
-                const cell = document.createElement('td');
-                cell.textContent = schedule[day][i] || '';
-                row.appendChild(cell);
-            });
-
-            const signCell = document.createElement('td');
-            signCell.textContent = '';
-            row.appendChild(signCell);
-
-            tableBody.appendChild(row);
-        }
-
-        showNotification('排班表生成成功！');
-
-        const { monday, friday } = getNextWeekRange();
-        const workbook = await loadTemplate();
-        exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
-
-    } catch (err) {
-        console.error(err);
-        showNotification('生成排班表失败: ' + err.message, true);
-    }
-}
-
 function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
     const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-    // 设置列宽：假设签到列宽为10，则姓名电话列宽设为20
-    // 根据原模板列位置调整，这里示例：
+    // 列宽配置（可保持不变）
+    /*
     ws['!cols'] = [
         { wch: 10 }, // A 列 - 时间
         { wch: 20 }, // B 列 - 星期一姓名/电话
-        { wch: 10 }, // C 列 - 可能的签到列
+        { wch: 10 }, // C 列 - 签到
         { wch: 20 }, // D 列 - 星期二姓名/电话
         { wch: 10 }, // E 列 - 签到
         { wch: 20 }, // F 列 - 星期三姓名/电话
         { wch: 10 }, // G 列 - 签到
-        // 继续根据模板添加列宽
+        { wch: 20 }, // H 列 - 星期四姓名/电话
+        { wch: 10 }, // I 列 - 签到
+        { wch: 20 }, // J 列 - 星期五姓名/电话
+        { wch: 10 }  // K 列 - 签到
     ];
-
+        */
     // 下一周日期写入模板 B3
     const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
     if (ws['B3']) {
-        ws['B3'].v = `${startStr}-${endStr}`;   // ✅ 只改值，不覆盖样式
+        ws['B3'].v = `${startStr}-${endStr}`;
     } else {
         ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
     }
 
-    // 映射表：每一天对应的单元格数组（只写左上角单元格）
+    // --- 核心函数：写入时复制已有样式 ---
+    function setCellValue(ws, targetCell, value, styleSourceCell) {
+        if (ws[targetCell]) {
+            ws[targetCell].v = value; // 已有单元格 → 保留样式
+        } else {
+            ws[targetCell] = {
+                t: 's',
+                v: value,
+                s: ws[styleSourceCell]?.s || {} // 复制样式
+            };
+        }
+    }
+
+    // --- 定义映射：每个目标单元格 + 一个样式来源单元格 ---
     const cellMapping = {
-        '星期一': ['B6','B8','B11','B13'],
-        '星期二': ['D6','D8','D11','D13'],
-        '星期三': ['F6','F8','F11','F13'],
-        '星期四': ['B17','B19','B22','B24'],
-        '星期五': ['D17','D19','D22','D24']
+        '星期一': [
+            { cell: 'B6', styleFrom: 'B5' },
+            { cell: 'B8', styleFrom: 'B7' },
+            { cell: 'B11', styleFrom: 'B10' },
+            { cell: 'B13', styleFrom: 'B12' }
+        ],
+        '星期二': [
+            { cell: 'D6', styleFrom: 'D5' },
+            { cell: 'D8', styleFrom: 'D7' },
+            { cell: 'D11', styleFrom: 'D10' },
+            { cell: 'D13', styleFrom: 'D12' }
+        ],
+        '星期三': [
+            { cell: 'F6', styleFrom: 'F5' },
+            { cell: 'F8', styleFrom: 'F7' },
+            { cell: 'F11', styleFrom: 'F10' },
+            { cell: 'F13', styleFrom: 'F12' }
+        ],
+        '星期四': [
+            { cell: 'B17', styleFrom: 'B16' },
+            { cell: 'B19', styleFrom: 'B18' },
+            { cell: 'B22', styleFrom: 'B21' },
+            { cell: 'B24', styleFrom: 'B23' }
+        ],
+        '星期五': [
+            { cell: 'D17', styleFrom: 'D16' },
+            { cell: 'D19', styleFrom: 'D18' },
+            { cell: 'D22', styleFrom: 'D21' },
+            { cell: 'D24', styleFrom: 'D23' }
+        ]
     };
 
+    // --- 根据 schedule 写入数据 ---
     for (const day of days) {
         const cells = cellMapping[day];
         if (!cells) continue;
 
         for (let i = 0; i < schedule[day].length; i++) {
             const value = schedule[day][i] || '';
-            const firstCell = cells[i]; // 只写左上角
-            if (firstCell) {
-                if (ws[firstCell]) {
-                    ws[firstCell].v = value;   // 只改值，保留边框/横线/样式
-                } else {
-                    ws[firstCell] = { t: 's', v: value };
-                }
+            const { cell, styleFrom } = cells[i] || {};
+            if (cell) {
+                setCellValue(ws, cell, value, styleFrom);
             }
         }
     }
 
+    // 自动计算周数（可选）
+    function getWeekNumber(date) {
+        const firstDay = new Date(date.getFullYear(), 0, 1);
+        const pastDays = (date - firstDay) / 86400000;
+        return Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
+    }
+    const weekNum = getWeekNumber(startDate);
+
     // 保存文件
-    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
+    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
     console.log("导出 Excel 文件:", filename);
     XLSX.writeFile(workbook, filename);
 }
