@@ -1,3 +1,5 @@
+import ExcelJS from 'exceljs';
+
 // ==================== GitHub 配置 ====================
 const GITHUB_CONFIG = {
     owner: 'grasscake492',
@@ -171,14 +173,6 @@ async function viewIssues() {
     }
 }
 
-// ==================== 模板读取 ====================
-async function loadTemplate() {
-    const response = await fetch('/schedule_template.xlsx');
-    if (!response.ok) throw new Error('模板文件加载失败');
-    const arrayBuffer = await response.arrayBuffer();
-    return XLSX.read(arrayBuffer, { type: 'array' });
-}
-
 // ==================== 排班生成 ====================
 async function generateScheduleFromGitHub() {
     const tableBody = document.querySelector('#schedule-table tbody');
@@ -255,8 +249,7 @@ async function generateScheduleFromGitHub() {
         showNotification('排班表生成成功！');
 
         const { monday, friday } = getNextWeekRange();
-        const workbook = await loadTemplate();
-        exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
+        await exportScheduleWithTemplate(schedule, timeSlots, days, monday, friday);
 
     } catch (err) {
         console.error(err);
@@ -264,17 +257,22 @@ async function generateScheduleFromGitHub() {
     }
 }
 
-function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
-    const ws = workbook.Sheets[workbook.SheetNames[0]];
+// ==================== 导出 Excel（ExcelJS） ====================
+async function exportScheduleWithTemplate(schedule, timeSlots, days, startDate, endDate) {
+    const workbook = new ExcelJS.Workbook();
 
-    // 下一周日期写入模板 B3
+    // 1. 加载模板
+    const response = await fetch('/schedule_template.xlsx');
+    const arrayBuffer = await response.arrayBuffer();
+    await workbook.xlsx.load(arrayBuffer);
+    const ws = workbook.getWorksheet(1);
+
+    // 2. 写入日期
     const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
-    if (ws['B3']) {
-        ws['B3'].v = `${startStr}-${endStr}`;   // ✅ 只改值，保留样式
-    }
+    ws.getCell('B3').value = `${startStr}-${endStr}`;
 
-    // --- 定义映射：每一天对应模板中预设的占位符单元格 ---
+    // 3. 定义映射
     const cellMapping = {
         '星期一': ['B6','B8','B11','B13'],
         '星期二': ['D6','D8','D11','D13'],
@@ -283,25 +281,22 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
         '星期五': ['D17','D19','D22','D24']
     };
 
-    // --- 遍历 schedule，把占位符替换成值 ---
+    // 4. 写入排班
     for (const day of days) {
         const cells = cellMapping[day];
         if (!cells) continue;
-
         for (let i = 0; i < schedule[day].length; i++) {
-            const value = schedule[day][i];  // “姓名（电话）” 或 undefined
-            const targetCell = cells[i];
-            if (ws[targetCell]) {
-                ws[targetCell].v = value && value.trim() !== '' ? value : '';
-                // 如果有值写入姓名电话
-                // 如果没值写空，清掉模板
-            }
+            ws.getCell(cells[i]).value = schedule[day][i] || '';
         }
     }
 
-    // --- 保存文件 ---
+    // 5. 浏览器下载
     const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
-    console.log("导出 Excel 文件:", filename);
-    XLSX.writeFile(workbook, filename);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
 }
-
