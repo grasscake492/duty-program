@@ -5,6 +5,49 @@ const GITHUB_CONFIG = {
     labels: ['scheduling', 'submission']
 };
 
+// ==================== 登录逻辑区域 ====================
+
+// 游客直接进入游客页面
+function loginAsGuest() {
+    window.location.href = "/guest.html";
+}
+
+// 点击“管理员登录”按钮时显示输入框
+function toggleAdminLogin() {
+    const adminBox = document.getElementById("admin-login");
+    if (adminBox.style.display === "none" || adminBox.style.display === "") {
+        adminBox.style.display = "block";
+    } else {
+        adminBox.style.display = "none";
+    }
+}
+
+// 管理员登录验证
+async function loginAsAdmin() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    try {
+        const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            alert("管理员登录成功！");
+            window.location.href = "/admin.html";
+        } else {
+            alert(data.error || "账号或密码错误！");
+        }
+    } catch (err) {
+        console.error("登录错误：", err);
+        alert("服务器连接失败，请稍后再试。");
+    }
+}
+
 // ==================== 工具函数 ====================
 
 // 下周范围（周一到周五）
@@ -267,8 +310,7 @@ async function generateScheduleFromGitHub() {
 function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
     const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-    // 设置列宽：假设签到列宽为10，则姓名电话列宽设为20
-    // 根据原模板列位置调整，这里示例：
+    // 根据原模板列位置调整
     ws['!cols'] = [
         { wch: 10 }, // A 列 - 时间
         { wch: 20 }, // B 列 - 星期一姓名/电话
@@ -284,8 +326,7 @@ function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDa
     const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
     const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
     if (ws['B3']) {
-        ws['B3'].v = `${startStr}-${endStr}`;   // ✅ 只改值，不覆盖样式
-    } else {
+        ws['B3'].v = `${startStr}-${endStr}`;
         ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
     }
 

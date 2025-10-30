@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游客-课表上传</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #ccc3e2 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .description {
+            color: #7f8c8d;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        input[type="text"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="tel"]:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s, transform 0.2s;
+        }
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 100px repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .time-slot {
+            background: #34495e;
+            color: white;
+            padding: 15px 10px;
+            text-align: center;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .day-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 10px;
+            text-align: center;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .schedule-cell {
+            background: #ecf0f1;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            border: 2px solid transparent;
+            user-select: none;
+        }
+        .schedule-cell.selected {
+            background: #2ecc71;
+            color: white;
+            font-weight: 600;
+            border-color: #27ae60;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            transform: scale(1.02);
+        }
+        /* 移除悬停效果，只保留点击效果 */
+        .schedule-cell:hover {
+            background: #ecf0f1; /* 保持原背景色，不变化 */
+        }
+        .schedule-cell.selected:hover {
+            background: #2ecc71; /* 选中状态下悬停也不变化 */
+        }
+        /* 点击动画效果 */
+        @keyframes cellClick {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        .schedule-cell.click-feedback {
+            animation: cellClick 0.3s ease;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 15px;
+            text-align: center;
+        }
+        th {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 12px 25px;
+            cursor: pointer;
+            background: #f8f9fa;
+            border-radius: 6px 6px 0 0;
+            margin-right: 5px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .admin-panel {
+            background: #fff8e1;
+            border-left: 4px solid #ffc107;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #2ecc71;
+            color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+        .notification.error {
+            background: #e74c3c;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f7;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+        }
+        .status-message.success {
+            border-left-color: #2ecc71;
+            background: #e8f5e8;
+        }
+        .status-message.error {
+            border-left-color: #e74c3c;
+            background: #fee;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .schedule-grid {
+                grid-template-columns: 80px repeat(5, 1fr);
+                gap: 5px;
+            }
+            .time-slot, .day-header, .schedule-cell {
+                padding: 10px 5px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>图片社自助上传课表系统</h1>
+        <p class="description">填写信息并选择可用时间段</p>
+    </header>
+
+    <div id="user" class="tab-content active">
+        <div class="card">
+            <h2>个人信息</h2>
+            <div class="form-group">
+                <label for="name">姓名</label>
+                <input type="text" id="name" placeholder="请输入您的姓名" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">手机号码</label>
+                <input type="tel" id="phone" placeholder="请输入手机号码" required>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>选择可用时间</h2>
+            <p>请勾选有空的时间段</p>
+
+            <div class="schedule-grid">
+                <div class="time-slot">时间/日期</div>
+                <div class="day-header">星期一</div>
+                <div class="day-header">星期二</div>
+                <div class="day-header">星期三</div>
+                <div class="day-header">星期四</div>
+                <div class="day-header">星期五</div>
+
+                <div class="time-slot">一二节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期一">第一二节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期二">第一二节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期三">第一二节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期四">第一二节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期五">第一二节</div>
+
+                <div class="time-slot">三四节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期一">第三四节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期二">第三四节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期三">第三四节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期四">第三四节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期五">第三四节</div>
+
+                <div class="time-slot">五六节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期一">第五六节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期二">第五六节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期三">第五六节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期四">第五六节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期五">第五六节</div>
+
+                <div class="time-slot">七八节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期一">第七八节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期二">第七八节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期三">第七八节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期四">第七八节</div>
+                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期五">第七八节</div>
+            </div>
+
+            <button id="submit-btn">提交排班</button>
+            <div id="submit-status" class="status-message">
+                请填写信息并选择可用时间后提交
+            </div>
+
+        </div>
+    </div>
+
+
+
+<div class="notification" id="notification">提交成功！</div>
+
+<script>
+    // ==================== 工具函数部分 ====================
+
+    // 切换单元格选择状态
+    function toggleCell(cell) {
+        cell.classList.toggle('selected');
+        provideClickFeedback(cell);
+    }
+
+    // 提供点击视觉反馈
+    function provideClickFeedback(cell) {
+        cell.classList.add('click-feedback');
+        setTimeout(() => {
+            cell.classList.remove('click-feedback');
+        }, 300);
+    }
+
+    // 清空表单函数
+    function clearForm() {
+        document.getElementById('name').value = '';
+        document.getElementById('phone').value = '';
+        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
+            cell.classList.remove('selected');
+        });
+        console.log('表单已清空');
+    }
+
+    // 设置提交状态
+    function setSubmitStatus(message, isLoading = false, isError = false) {
+        const statusElement = document.getElementById('submit-status');
+        const submitButton = document.getElementById('submit-btn');
+
+        statusElement.textContent = message;
+        statusElement.className = 'status-message' +
+            (isError ? ' error' : '') +
+            (isLoading ? ' loading' : '');
+
+        submitButton.disabled = isLoading;
+    }
+
+    // 显示通知
+    function showNotification(message, isError = false) {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = 'notification' + (isError ? ' error' : '');
+        notification.classList.add('show');
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+
+    // ==================== 提交函数部分 ====================
+
+    // 验证提交数据
+    function validateSubmissionData(data) {
+        const errors = [];
+
+        if (!data.name || data.name.trim().length < 2) {
+            errors.push('输入有效的姓名(必须多于两个字符) :D');
+        }
+
+        if (!data.phone || !/^1[3-9]\d{9}$/.test(data.phone)) {
+            errors.push('输入正确的手机号码');
+        }
+
+        if (!data.availability || data.availability.length === 0) {
+            errors.push('请至少选择一个可用时间段（不想值班可以不填表的……）');
+        }
+
+        return errors;
+    }
+
+    // 构建提交数据
+    function buildSubmissionData() {
+        const name = document.getElementById('name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+
+        // 获取选中的时间段
+        const availability = [];
+        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
+            availability.push({
+                day: cell.getAttribute('data-day'),
+                time: cell.getAttribute('data-time')
+            });
+        });
+
+        return {
+            name: name,
+            phone: phone,
+            availability: availability,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    // 提交数据到自己的后端A/P/I
+    // 提交数据到 Vercel 后端 A/P/I
+    async function submitToBackend() {
+        const submissionData = buildSubmissionData();
+
+        // 数据验证
+        const validationErrors = validateSubmissionData(submissionData);
+        if (validationErrors.length > 0) {
+            showNotification(validationErrors[0], true);
+            return;
+        }
+
+        setSubmitStatus('正在提交...', true);
+
+        try {
+            const response = await fetch('/api/create-issue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submissionData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                showNotification('提交成功！');
+                setSubmitStatus('提交成功！', false);
+
+                if (result.issueUrl) {
+                    window.open(result.issueUrl, '_blank'); // 打开 GitHub Issue
+                }
+
+                clearForm();
+            } else {
+                throw new Error(result.error || '提交失败，请联系492');
+            }
+        } catch (error) {
+            console.error('提交失败:', error);
+            showNotification('提交失败: ' + error.message, true);
+            setSubmitStatus('提交失败: ' + error.message, false, true);
+        } finally {
+            document.getElementById('submit-btn').disabled = false;
+        }
+    }
+
+
+    // ==================== 初始化部分 ====================
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('排班系统已加载');
+
+        // 绑定提交按钮事件
+        const submitButton = document.getElementById('submit-btn');
+        if (submitButton) {
+            submitButton.addEventListener('click', submitToBackend);
+        }
+
+        // 添加回车键提交支持
+        const nameInput = document.getElementById('name');
+        const phoneInput = document.getElementById('phone');
+
+        if (nameInput && phoneInput) {
+            const handleEnterKey = (event) => {
+                if (event.key === 'Enter') {
+                    submitToBackend();
+                }
+            };
+
+            nameInput.addEventListener('keypress', handleEnterKey);
+            phoneInput.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // ==================== 辅助函数（可选） ====================
+    //增加切换按钮
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+
+        document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    // 测试API连通性（开发时使用）
+    async function testAPIConnection() {
+        try {
+            const response = await fetch('/api/create-issue', {
+                method: 'OPTIONS'
+            });
+            console.log('API连通性测试:', response.status);
+            return response.ok;
+        } catch (error) {
+            console.warn('API测试失败:', error);
+            return false;
+        }
+    }
+
+    // 页面加载时测试API
+    window.addEventListener('load', function() {
+        // 开发环境下测试API连通性
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            testAPIConnection();
+        }
+    });
+</script>
+<!-- 引入 XLSX (js-xlsx) 库 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!-- 你的主逻辑 -->
+<script src="/js/main.js"></script>
+</body>
+</html>
