@@ -319,16 +319,13 @@
                 <input type="tel" id="phone" placeholder="请输入手机号码" required>
             </div>
 
-            <div class="form-group">
-                <label>身份选择</label>
-                <div class="role-options">
-                    <label class="role-option">
-                        <input type="radio" name="role" value="intern"> 实习
-                    </label>
-                    <label class="role-option">
-                        <input type="radio" name="role" value="senior"> 中高级
-                    </label>
-                </div>
+            <div class="role-options">
+                <label class="role-option">
+                    <input type="radio" name="role" value="intern"> 实习
+                </label>
+                <label class="role-option">
+                    <input type="radio" name="role" value="senior"> 中高级
+                </label>
             </div>
 
         </div>
@@ -810,6 +807,21 @@
 </script>
 <!-- 引入 XLSX (js-xlsx) 库 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<!-- body 末尾，引入 main.js 或直接写在这里 -->
+<script>
+    let selectedRole = null; // 全局变量保存选中的身份
+
+    // 等 DOM 加载完成再绑定事件
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input[name="role"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                selectedRole = e.target.value;
+                console.log('当前选中身份:', selectedRole);
+            });
+        });
+    });
+</script>
+
 
 <!-- 你的主逻辑 -->
 <script src="/js/main.js"></script>
