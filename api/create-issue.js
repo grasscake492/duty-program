@@ -12,18 +12,18 @@ export default async function handler(req, res) {
 
         const { name, phone, availability, role } = req.body;
 
-        // ✅ 现在 role 为必需字段
+        // 现在 role 为必需字段
         if (!name || !phone || !availability || !Array.isArray(availability) || availability.length === 0 || !role) {
             return res.status(400).json({ error: "缺少必要字段 (name, phone, availability, role)" });
         }
 
-        // ✅ 角色对应 GitHub 标签（可见效果更好）
+        // 角色对应 GitHub 标签（可见效果更好）
         const roleLabel = role === "intern" ? "实习" : "中高级";
 
         const issueBody = JSON.stringify({
             name,
             phone,
-            role, // ✅ 新增，直接写入 JSON
+            role, // 新增，直接写入 JSON
             availability,
             timestamp: new Date().toISOString()
         });

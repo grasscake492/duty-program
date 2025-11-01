@@ -648,7 +648,8 @@
         const phone = document.getElementById('phone').value.trim();
 
         // 获取身份选择（单选）
-        const role = document.querySelector('input[name="role"]:checked')?.value;
+        const roleInput = document.querySelector('input[name="role"]:checked');
+        const role = roleInput ? roleInput.value : null;
 
         // 获取选中的时间段
         const availability = [];
