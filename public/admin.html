@@ -644,27 +644,33 @@
 
     // 构建提交数据
     function buildSubmissionData() {
-        const name = document.getElementById('name').value.trim();
-        const phone = document.getElementById('phone').value.trim();
+        // 获取姓名和电话
+        const nameInput = document.getElementById('name');
+        const phoneInput = document.getElementById('phone');
+        const name = nameInput ? nameInput.value.trim() : '';
+        const phone = phoneInput ? phoneInput.value.trim() : '';
 
-        // 获取身份选择（单选）
+        // 获取身份选择（单选 radio）
         const roleInput = document.querySelector('input[name="role"]:checked');
-        const role = roleInput ? roleInput.value : null;
+        const role = roleInput ? roleInput.value : ''; // 如果未选中返回空字符串
 
-        // 获取选中的时间段
+        // 获取选中的可用时间段
         const availability = [];
-        document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
-            availability.push({
-                day: cell.getAttribute('data-day'),
-                time: cell.getAttribute('data-time')
-            });
+        const selectedCells = document.querySelectorAll('.schedule-cell.selected');
+        selectedCells.forEach(cell => {
+            const day = cell.getAttribute('data-day') || '';
+            const time = cell.getAttribute('data-time') || '';
+            if (day && time) {
+                availability.push({ day, time });
+            }
         });
 
+        // 返回提交对象
         return {
-            name: name,
-            phone: phone,
-            role: role,                 // 新增身份字段
-            availability: availability,
+            name,
+            phone,
+            role,
+            availability,
             timestamp: new Date().toISOString()
         };
     }
