@@ -87,6 +87,16 @@ function showNotification(message, isError = false) {
 }
 
 // 构建提交数据
+function let selectedRole = null;
+
+// 绑定 change 事件
+document.querySelectorAll('input[name="role"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        selectedRole = e.target.value;
+        console.log('当前选中身份:', selectedRole);
+    });
+});
+
 function buildSubmissionData() {
     const name = document.getElementById('name').value.trim();
     const phone = document.getElementById('phone').value.trim();
@@ -99,25 +109,16 @@ function buildSubmissionData() {
         });
     });
 
-    const submission = { name, phone, availability, timestamp: new Date().toISOString() };
+    const submission = {
+        name,
+        phone,
+        role: selectedRole,       // <- 必须加上 role
+        availability,
+        timestamp: new Date().toISOString()
+    };
+
     console.log("构建的提交数据:", submission);
     return submission;
-}
-
-// 校验数据
-function validateSubmissionData(data) {
-    const errors = [];
-    if (!data.name || data.name.length < 2) errors.push('请输入有效的姓名（至少2个字符）');
-    if (!data.phone || !/^1[3-9]\d{9}$/.test(data.phone)) errors.push('请输入有效的手机号码');
-    if (!data.availability || data.availability.length === 0) errors.push('请至少选择一个可用时间段');
-    return errors;
-}
-
-// 清空表单
-function clearForm() {
-    document.getElementById('name').value = '';
-    document.getElementById('phone').value = '';
-    document.querySelectorAll('.schedule-cell.selected').forEach(cell => cell.classList.remove('selected'));
 }
 
 // ==================== 提交数据 ====================
