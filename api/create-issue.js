@@ -33,7 +33,7 @@ export default async function handler(req, res) {
             body: issueBody,
             labels: [
                 ...(GITHUB_LABELS ? GITHUB_LABELS.split(",").map(l => l.trim()) : ["scheduling"]),
-                roleLabel // ✅ 区分身份
+                roleLabel //区分身份
             ],
         };
 

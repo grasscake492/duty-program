@@ -890,10 +890,10 @@
         window.open(githubRepoIssuesUrl, "_blank");
     }
 
-    // ==================== 管理员排班表功能（兼容 JSON Issue、去重、role） ====================
+    // ==================== 管理员排班表功能（兼容 JSON Issue、去重、role + 电话） ====================
     async function generateScheduleFromGitHub() {
         try {
-            //拉取 GitHub Issues
+            // 拉取 GitHub Issues
             const resp = await fetch('/api/fetch-issues', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
             if (!resp.ok) throw new Error('拉取数据失败');
             const issues = await resp.json();
@@ -910,14 +910,13 @@
                 return sched;
             }
 
-            //解析 GitHub Issues 并去重（同名只保留最新提交）
+            // 解析 GitHub Issues 并去重（同名只保留最新提交）
             const latestByName = {};
             issues.forEach(issue => {
                 try {
                     const body = issue.body || '';
                     const ts = new Date(issue.timestamp || issue.created_at || Date.now()).getTime();
 
-                    // JSON body
                     let data;
                     try { data = JSON.parse(body); } catch { data = null; }
                     if (!data || !data.name || !data.phone || !data.role || !Array.isArray(data.availability)) return;
@@ -930,7 +929,6 @@
                         timestamp: ts
                     };
 
-                    // 保留最新提交
                     if (!latestByName[person.name] || ts > latestByName[person.name].timestamp) {
                         latestByName[person.name] = person;
                     }
@@ -939,7 +937,7 @@
                 }
             });
 
-            //身份分类
+            // 身份分类
             const interns = [], seniors = [];
             Object.values(latestByName).forEach(p => {
                 if (p.role === 'intern') interns.push(p);
@@ -948,7 +946,7 @@
 
             const schedule = emptySchedule();
 
-            /// 快速贪心匹配，优先在提交数据的第一个空时间安排，并在没人的地方安排
+            // 贪心排班，优先空格
             function assignPeople(list, type) {
                 list.sort((a, b) => a.availability.length - b.availability.length); // 可用少优先
                 const assigned = new Set();
@@ -965,15 +963,10 @@
                         if (timeIdx < 0 || !schedule[day]) continue;
 
                         const tsObj = schedule[day][timeIdx];
-
-                        // 判断格子是否完全空
                         const isEmptySlot = !tsObj.intern && !tsObj.senior;
-
                         if (!tsObj[type]) {
-                            // 给空格一个负值，使其优先被选中
                             const load = type === 'intern' ? tsObj.internCount : tsObj.seniorCount;
                             const effectiveLoad = isEmptySlot ? -1 : load;
-
                             if (effectiveLoad < minLoad) {
                                 minLoad = effectiveLoad;
                                 bestSlot = { day, timeIdx };
@@ -997,8 +990,7 @@
             assignPeople(interns, 'intern');
             assignPeople(seniors, 'senior');
 
-
-            //渲染排班表
+            // 渲染排班表（姓名 + 电话）
             const tableBody = document.querySelector('#schedule-table tbody');
             if (!tableBody) return;
 
@@ -1015,8 +1007,20 @@
                 days.forEach(d => {
                     const cell = document.createElement('td');
                     const val = [];
-                    if (schedule[d][ti].intern) val.push(schedule[d][ti].intern + '（实习）');
-                    if (schedule[d][ti].senior) val.push(schedule[d][ti].senior + '（中高级）');
+
+                    const internName = schedule[d][ti].intern;
+                    const seniorName = schedule[d][ti].senior;
+
+                    if (internName) {
+                        const phone = latestByName[internName]?.phone || '';
+                        val.push(`${internName}（${phone}）`);
+                    }
+
+                    if (seniorName) {
+                        const phone = latestByName[seniorName]?.phone || '';
+                        val.push(`${seniorName}（${phone}）`);
+                    }
+
                     if (!val.length) emptyCount++;
                     cell.textContent = val.join(', ');
                     row.appendChild(cell);
@@ -1027,11 +1031,15 @@
 
             showNotification(`排班完成，无人值班节数: ${emptyCount}`);
 
+            const { monday, friday } = getNextWeekRange();
+            exportScheduleWithTemplate(schedule, monday, friday);
+
         } catch (err) {
             console.error(err);
             showNotification('生成排班表失败: ' + err.message, true);
         }
     }
+
 
 
     // ==================== 提交函数部分 ====================

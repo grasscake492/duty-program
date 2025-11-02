@@ -5,7 +5,7 @@ export default function handler(req, res) {
 
     const { username, password } = req.body;
 
-    // 这里写死管理员账号和密码
+    // 写死管理员账号和密码
     const ADMIN_USER = "kamukura";
     const ADMIN_PASS = "PANN0101";
 
