@@ -890,7 +890,6 @@
         window.open(githubRepoIssuesUrl, "_blank");
     }
 
-    // ==================== 管理员排班表功能（全局最优-简化贪心版） ====================
     async function generateScheduleFromGitHub() {
         try {
             const resp = await fetch('/api/fetch-issues', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
@@ -914,47 +913,65 @@
                 return sched;
             }
 
-            const interns = [], seniors = [];
-
-            // 解析 GitHub Issues 数据
+            // 解析 GitHub Issues 并去重（按最新 timestamp 保留）
+            const latestByName = {};
             issues.forEach(issue => {
-                const body = issue.body || '';
-                const name = (body.match(/\*\*姓名\*\*[:：]\s*(.+)/i)?.[1] || '未知').trim();
-                const phone = (body.match(/\*\*电话\*\*[:：]\s*(.+)/i)?.[1] || '').trim();
-                let role = 'intern';
-                const rawRole = body.match(/\*\*身份\*\*[:：]\s*(.+)/i)?.[1]?.trim().toLowerCase() || '';
-                if (rawRole.includes('中') || rawRole.includes('高') || rawRole.includes('senior')) {
-                    role = 'senior';
+                try {
+                    const body = issue.body || '';
+                    const ts = new Date(issue.created_at || issue.updated_at || Date.now()).getTime();
+
+                    // 姓名
+                    const name = (body.match(/\*\*姓名\*\*[:：]\s*(.+)/i)?.[1] || '未知').trim();
+                    // 电话
+                    const phone = (body.match(/\*\*电话\*\*[:：]\s*(.+)/i)?.[1] || '').trim();
+                    // 身份
+                    let role = 'intern';
+                    const rawRole = body.match(/\*\*身份\*\*[:：]\s*(.+)/i)?.[1]?.trim().toLowerCase() || '';
+                    if (rawRole.includes('中') || rawRole.includes('高') || rawRole.includes('senior')) role = 'senior';
+                    // 可用时间
+                    let availability = [];
+                    const match = body.match(/\*\*有空时间段\*\*[:：]\s*([\s\S]+)/i);
+                    if (match && match[1]) {
+                        availability = match[1]
+                            .split(/[\n,;；、]+/)
+                            .map(s => s.trim())
+                            .filter(Boolean)
+                            .map(s => {
+                                const day = days.find(d => s.includes(d));
+                                const time = timeSlots.find(t => s.includes(t));
+                                return day && time ? { day, time } : null;
+                            })
+                            .filter(Boolean);
+                    }
+
+                    const person = { name, phone, role, availability, timestamp: ts };
+
+                    // 保留最新提交
+                    if (!latestByName[name] || ts > latestByName[name].timestamp) {
+                        latestByName[name] = person;
+                    }
+                } catch (err) {
+                    console.warn('解析 issue 失败', issue, err);
                 }
+            });
 
-                let availability = [];
-                const match = body.match(/\*\*有空时间段\*\*[:：]\s*([\s\S]+)/i);
-                if (match && match[1]) {
-                    availability = match[1]
-                        .split(/[\n,;；、]+/)
-                        .map(s => s.trim())
-                        .filter(Boolean)
-                        .map(s => {
-                            const day = days.find(d => s.includes(d));
-                            const time = timeSlots.find(t => s.includes(t));
-                            return day && time ? { day, time } : null;
-                        })
-                        .filter(Boolean);
-                }
-
-                const person = { name, phone, availability, role };
-
-                if (role === 'intern') interns.push(person);
-                else seniors.push(person);
+            // 按身份分类
+            const interns = [], seniors = [];
+            Object.values(latestByName).forEach(p => {
+                if (p.role === 'intern') interns.push(p);
+                else seniors.push(p);
             });
 
             const schedule = emptySchedule();
 
-            // 快速贪心匹配
+            // 快速贪心匹配函数
             function assignPeople(list, type) {
-                list.sort((a, b) => a.availability.length - b.availability.length); // 按可选少优先排
+                list.sort((a, b) => a.availability.length - b.availability.length); // 可选少优先排
+                const assigned = new Set();
 
                 list.forEach(p => {
+                    if (assigned.has(p.name)) return;
+
                     let bestSlot = null;
                     let minLoad = Infinity;
 
@@ -963,9 +980,9 @@
                         const timeIdx = timeSlots.indexOf(slot.time);
                         if (timeIdx < 0) return;
 
-                        const ts = schedule[day][timeIdx];
-                        if (!ts[type]) {
-                            const load = type === 'intern' ? ts.internCount : ts.seniorCount;
+                        const tsObj = schedule[day][timeIdx];
+                        if (!tsObj[type]) {
+                            const load = type === 'intern' ? tsObj.internCount : tsObj.seniorCount;
                             if (load < minLoad) {
                                 minLoad = load;
                                 bestSlot = { day, timeIdx };
@@ -974,10 +991,14 @@
                     });
 
                     if (bestSlot) {
-                        const ts = schedule[bestSlot.day][bestSlot.timeIdx];
-                        ts[type] = p.name;
-                        if (type === 'intern') ts.internCount++;
-                        else ts.seniorCount++;
+                        const tsObj = schedule[bestSlot.day][bestSlot.timeIdx];
+                        tsObj[type] = p.name;
+                        if (type === 'intern') tsObj.internCount++;
+                        else tsObj.seniorCount++;
+                        assigned.add(p.name);
+                        console.log(`已排班: ${p.name} (${type}) 在 ${bestSlot.day} ${timeSlots[bestSlot.timeIdx]}`);
+                    } else {
+                        console.warn(`未能排班: ${p.name} (${type})`);
                     }
                 });
             }
@@ -985,7 +1006,7 @@
             assignPeople(interns, 'intern');
             assignPeople(seniors, 'senior');
 
-            // 渲染排班表
+            // 渲染表格
             const tableBody = document.querySelector('#schedule-table tbody');
             tableBody.innerHTML = '';
             let emptyCount = 0;
@@ -1008,10 +1029,10 @@
                 tableBody.appendChild(row);
             }
 
-            showNotification(`排班完成 无人值班节数: ${emptyCount}`);
-        } catch(err){
+            showNotification(`排班完成，无人值班节数: ${emptyCount}`);
+        } catch (err) {
             console.error(err);
-            showNotification('生成排班表失败: '+err.message,true);
+            showNotification('生成排班表失败: ' + err.message, true);
         }
     }
 
