@@ -269,67 +269,93 @@ async function generateScheduleFromGitHub() {
         const timeSlots = ['一二节','三四节','五六节','七八节'];
 
         const schedule = {};
-        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(''));
+        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
+
+        // 构建最新提交字典，用于查手机号
+        const latestByName = {};
+        thisWeekIssues.forEach(issue => {
+            try {
+                const data = JSON.parse(issue.body);
+                if (!data.name) return;
+                const ts = new Date(data.timestamp || issue.created_at || Date.now()).getTime();
+                if (!latestByName[data.name] || ts > latestByName[data.name].timestamp) {
+                    latestByName[data.name] = { ...data, timestamp: ts };
+                }
+            } catch {}
+        });
 
         const assignedPeople = new Set();
 
-        for (const issue of thisWeekIssues) {
-            try {
-                const data = JSON.parse(issue.body);
-                const name = data.name || '';
-                const phone = data.phone || '';
-                const availability = data.availability || [];
+        // 排班
+        Object.values(latestByName).forEach(p => {
+            if (!p.availability || assignedPeople.has(p.name)) return;
+            let placed = false;
 
-                console.log(`处理 issue: ${name}`, availability);
+            // 优先空格
+            p.availability.sort(slot => {
+                const day = slot.day;
+                const timeIdx = timeSlots.indexOf(slot.time);
+                const cell = schedule[day]?.[timeIdx];
+                return cell ? 1 : -1; // 空格排前
+            });
 
-                if (assignedPeople.has(name)) continue;
+            for (const slot of p.availability) {
+                const dayIndex = days.indexOf(slot.day);
+                const timeIndex = timeSlots.indexOf(slot.time);
+                if (dayIndex < 0 || timeIndex < 0) continue;
 
-                let placed = false;
-                availability.some(slot => {
-                    const dayIndex = days.indexOf(slot.day);
-                    const timeIndex = timeSlots.indexOf(slot.time);
-                    console.log("匹配 slot:", slot, "dayIndex:", dayIndex, "timeIndex:", timeIndex);
+                const cell = schedule[slot.day][timeIndex];
+                if (!cell) {
+                    schedule[slot.day][timeIndex] = { intern: null, senior: null };
+                }
 
-                    if (dayIndex >= 0 && timeIndex >= 0 && !schedule[slot.day][timeIndex]) {
-                        schedule[slot.day][timeIndex] = `${name}（${phone}）`;
-                        assignedPeople.add(name);
-                        placed = true;
-                        return true;
-                    }
-                    return false;
-                });
+                const tsObj = schedule[slot.day][timeIndex];
+                const role = p.role || 'intern';
 
-                if (!placed) console.warn(`未能排班: ${name}`);
-            } catch (err) {
-                console.warn("解析 issue.body 失败:", issue.body);
+                if (!tsObj[role]) {
+                    tsObj[role] = p.name;
+                    assignedPeople.add(p.name);
+                    placed = true;
+                    break;
+                }
             }
-        }
 
-        console.log("最终生成的 schedule:", schedule);
+            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
+        });
 
         // 渲染表格
         tableBody.innerHTML = '';
-        for (let i = 0; i < timeSlots.length; i++) {
+        let emptyCount = 0;
+
+        for (let ti = 0; ti < timeSlots.length; ti++) {
             const row = document.createElement('tr');
             const timeCell = document.createElement('td');
-            timeCell.textContent = timeSlots[i];
+            timeCell.textContent = timeSlots[ti];
             row.appendChild(timeCell);
 
-            days.forEach(day => {
+            days.forEach(d => {
                 const cell = document.createElement('td');
-                cell.textContent = schedule[day][i] || '';
+                const val = [];
+                const tsObj = schedule[d][ti];
+                if (tsObj?.intern) {
+                    const phone = latestByName[tsObj.intern]?.phone || '';
+                    val.push(`${tsObj.intern}（${phone}）`);
+                }
+                if (tsObj?.senior) {
+                    const phone = latestByName[tsObj.senior]?.phone || '';
+                    val.push(`${tsObj.senior}（${phone}）`);
+                }
+                if (!val.length) emptyCount++;
+                cell.textContent = val.join(', ');
                 row.appendChild(cell);
             });
-
-            const signCell = document.createElement('td');
-            signCell.textContent = '';
-            row.appendChild(signCell);
 
             tableBody.appendChild(row);
         }
 
-        showNotification('排班表生成成功！');
+        showNotification(`排班表生成成功，无人值班节数: ${emptyCount}`);
 
+        // 导出 Excel
         const { monday, friday } = getNextWeekRange();
         const workbook = await loadTemplate();
         exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
@@ -338,3 +364,41 @@ async function generateScheduleFromGitHub() {
         console.error(err);
         showNotification('生成排班表失败: ' + err.message, true);
     }
+}
+
+
+
+    async function exportScheduleWithTemplate(schedule, startDate, endDate) {
+        const workbook = await loadTemplate();
+        const ws = workbook.Sheets[workbook.SheetNames[0]];
+
+        // 更新 B3 日期
+        const startStr = `${startDate.getFullYear()}年${startDate.getMonth()+1}月${startDate.getDate()}日`;
+        const endStr = `${endDate.getMonth()+1}月${endDate.getDate()}日`;
+        setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
+
+        // 定义映射
+        const cellMapping = {
+            '星期一': [ {cell:'B6', styleFrom:'B5'}, {cell:'B8', styleFrom:'B7'}, {cell:'B11', styleFrom:'B10'}, {cell:'B13', styleFrom:'B12'} ],
+            '星期二': [ {cell:'D6', styleFrom:'D5'}, {cell:'D8', styleFrom:'D7'}, {cell:'D11', styleFrom:'D10'}, {cell:'D13', styleFrom:'D12'} ],
+            '星期三': [ {cell:'F6', styleFrom:'F5'}, {cell:'F8', styleFrom:'F7'}, {cell:'F11', styleFrom:'F10'}, {cell:'F13', styleFrom:'F12'} ],
+            '星期四': [ {cell:'B17', styleFrom:'B16'}, {cell:'B19', styleFrom:'B18'}, {cell:'B22', styleFrom:'B21'}, {cell:'B24', styleFrom:'B23'} ],
+            '星期五': [ {cell:'D17', styleFrom:'D16'}, {cell:'D19', styleFrom:'D18'}, {cell:'D22', styleFrom:'D21'}, {cell:'D24', styleFrom:'D23'} ]
+        };
+
+        // 写入 schedule
+        const days = Object.keys(cellMapping);
+        days.forEach(day => {
+            const cells = cellMapping[day];
+            schedule[day].forEach((value, i) => {
+                if (cells[i]) setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
+            });
+        });
+
+        // 保存 Excel
+        const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(),0,1))/86400000 + new Date(startDate.getFullYear(),0,1).getDay()+1)/7);
+        const filename = `新闻嗅觉图片社${startDate.getMonth()+1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
+        XLSX.writeFile(workbook, filename);
+        console.log("导出 Excel 文件:", filename);
+    }
+

@@ -893,7 +893,7 @@
     // ==================== 管理员排班表功能（兼容 JSON Issue、去重、role） ====================
     async function generateScheduleFromGitHub() {
         try {
-            // 1️⃣ 拉取 GitHub Issues
+            //拉取 GitHub Issues
             const resp = await fetch('/api/fetch-issues', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
             if (!resp.ok) throw new Error('拉取数据失败');
             const issues = await resp.json();
@@ -910,7 +910,7 @@
                 return sched;
             }
 
-            // 2️⃣ 解析 GitHub Issues 并去重（同名只保留最新提交）
+            //解析 GitHub Issues 并去重（同名只保留最新提交）
             const latestByName = {};
             issues.forEach(issue => {
                 try {
@@ -939,7 +939,7 @@
                 }
             });
 
-            // 3️⃣ 按身份分类
+            //身份分类
             const interns = [], seniors = [];
             Object.values(latestByName).forEach(p => {
                 if (p.role === 'intern') interns.push(p);
@@ -948,7 +948,7 @@
 
             const schedule = emptySchedule();
 
-            // 4️⃣ 快速贪心匹配
+            /// 快速贪心匹配，优先在提交数据的第一个空时间安排，并在没人的地方安排
             function assignPeople(list, type) {
                 list.sort((a, b) => a.availability.length - b.availability.length); // 可用少优先
                 const assigned = new Set();
@@ -956,6 +956,8 @@
                 list.forEach(p => {
                     if (assigned.has(p.name)) return;
                     let placed = false;
+                    let bestSlot = null;
+                    let minLoad = Infinity;
 
                     for (const slot of p.availability) {
                         const day = slot.day;
@@ -963,23 +965,40 @@
                         if (timeIdx < 0 || !schedule[day]) continue;
 
                         const tsObj = schedule[day][timeIdx];
+
+                        // 判断格子是否完全空
+                        const isEmptySlot = !tsObj.intern && !tsObj.senior;
+
                         if (!tsObj[type]) {
-                            tsObj[type] = p.name;
-                            tsObj[`${type}Count`]++; // 统计人数
-                            assigned.add(p.name);
-                            placed = true;
-                            break;
+                            // 给空格一个负值，使其优先被选中
+                            const load = type === 'intern' ? tsObj.internCount : tsObj.seniorCount;
+                            const effectiveLoad = isEmptySlot ? -1 : load;
+
+                            if (effectiveLoad < minLoad) {
+                                minLoad = effectiveLoad;
+                                bestSlot = { day, timeIdx };
+                            }
                         }
                     }
 
-                    if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
+                    if (bestSlot) {
+                        const tsObj = schedule[bestSlot.day][bestSlot.timeIdx];
+                        tsObj[type] = p.name;
+                        tsObj[`${type}Count`]++;
+                        assigned.add(p.name);
+                        placed = true;
+                        console.log(`已排班: ${p.name} (${type}) 在 ${bestSlot.day} ${timeSlots[bestSlot.timeIdx]}`);
+                    }
+
+                    if (!placed) console.warn(`未能排班: ${p.name} (${type})`);
                 });
             }
 
             assignPeople(interns, 'intern');
             assignPeople(seniors, 'senior');
 
-            // 5️⃣ 渲染排班表
+
+            //渲染排班表
             const tableBody = document.querySelector('#schedule-table tbody');
             if (!tableBody) return;
 
