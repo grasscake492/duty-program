@@ -88,10 +88,10 @@ function showNotification(message, isError = false) {
 
 // ==================== 构建提交数据 & role 绑定 ====================
 
-// 记录当前选中的身份
+// 构建提交数据
 let selectedRole = null;
 
-// 绑定 role radio 按钮事件（修改部分）
+// 绑定 role radio 按钮事件
 function bindRoleRadios() {
     const radios = document.querySelectorAll('input[name="role"]');
     radios.forEach(radio => {
@@ -109,8 +109,11 @@ function bindRoleRadios() {
     });
 }
 
+// 页面加载完成后绑定
+document.addEventListener('DOMContentLoaded', bindRoleRadios);
+
+
 // 确保 DOM 渲染完成后再绑定
-window.addEventListener('DOMContentLoaded', bindRoleRadios);
 
 function buildSubmissionData() {
     const name = document.getElementById('name').value.trim();
