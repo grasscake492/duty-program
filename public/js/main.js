@@ -178,13 +178,28 @@ async function submitToBackend() {
 
 // ==================== GitHub 数据操作 ====================
 async function fetchGitHubIssues() {
-    console.log("fetchGitHubIssues 被调用了");
     const response = await fetch('/api/fetch-issues');
     if (!response.ok) throw new Error('拉取 GitHub Issues 失败');
-    const data = await response.json();
-    console.log("拉取到的 issues:", data);
-    return data;
+
+    const issues = await response.json();
+
+    // 解析 JSON body
+    const parsed = issues.map(issue => {
+        try {
+            const data = JSON.parse(issue.body);
+            if (!data.name || !data.phone || !data.role || !data.availability) return null;
+            data.timestamp = new Date(data.timestamp || issue.created_at);
+            data.html_url = issue.html_url;
+            return data;
+        } catch (err) {
+            console.warn('解析 Issue body 失败', issue.html_url);
+            return null;
+        }
+    }).filter(Boolean);
+
+    return parsed;
 }
+
 
 // ==================== 过滤函数 ====================
 function filterThisWeekIssues(issues) {
