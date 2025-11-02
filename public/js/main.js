@@ -87,7 +87,7 @@ function showNotification(message, isError = false) {
 }
 
 // 构建提交数据
-function let selectedRole = null;
+let selectedRole = null;
 
 // 绑定 change 事件
 document.querySelectorAll('input[name="role"]').forEach(radio => {

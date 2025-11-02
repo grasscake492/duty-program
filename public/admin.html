@@ -950,9 +950,9 @@
 
             const schedule = emptySchedule();
 
-            // ✅ A 方案：快速贪心匹配
+            // 快速贪心匹配
             function assignPeople(list, type) {
-                list.sort((a, b) => a.availability.length - b.availability.length); // ✅ 按可选少优先排
+                list.sort((a, b) => a.availability.length - b.availability.length); // 按可选少优先排
 
                 list.forEach(p => {
                     let bestSlot = null;
@@ -1202,7 +1202,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="/js/main.js"></script>
 
-<!-- 你的主逻辑 -->
+
 <script src="/js/main.js"></script>
 </body>
 </html>
