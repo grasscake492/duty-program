@@ -323,7 +323,7 @@ async function generateScheduleFromGitHub() {
             if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
         });
 
-        // 渲染表格
+        // --- 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）" ---
         tableBody.innerHTML = '';
         let emptyCount = 0;
 
@@ -335,18 +335,21 @@ async function generateScheduleFromGitHub() {
 
             days.forEach(d => {
                 const cell = document.createElement('td');
-                const val = [];
                 const tsObj = schedule[d][ti];
+                const valArr = [];
+
+                // 实习生优先
                 if (tsObj?.intern) {
                     const phone = latestByName[tsObj.intern]?.phone || '';
-                    val.push(`${tsObj.intern}（${phone}）`);
+                    valArr.push(`${tsObj.intern}（${phone}）`);
                 }
                 if (tsObj?.senior) {
                     const phone = latestByName[tsObj.senior]?.phone || '';
-                    val.push(`${tsObj.senior}（${phone}）`);
+                    valArr.push(`${tsObj.senior}（${phone}）`);
                 }
-                if (!val.length) emptyCount++;
-                cell.textContent = val.join(', ');
+
+                if (!valArr.length) emptyCount++;
+                cell.textContent = valArr.join(', '); // 拼接成 "xxx（电话）, xxx（电话）"
                 row.appendChild(cell);
             });
 
@@ -355,11 +358,6 @@ async function generateScheduleFromGitHub() {
 
         showNotification(`排班表生成成功，无人值班节数: ${emptyCount}`);
 
-        // 导出 Excel
-        const { monday, friday } = getNextWeekRange();
-        const workbook = await loadTemplate();
-        exportScheduleWithTemplate(workbook, schedule, timeSlots, days, monday, friday);
-
     } catch (err) {
         console.error(err);
         showNotification('生成排班表失败: ' + err.message, true);
@@ -367,38 +365,53 @@ async function generateScheduleFromGitHub() {
 }
 
 
+<!--excel生成函数-->
+async function exportScheduleWithTemplate(schedule, startDate, endDate) {
+    const workbook = await loadTemplate();
+    const ws = workbook.Sheets[workbook.SheetNames[0]];
 
-    async function exportScheduleWithTemplate(schedule, startDate, endDate) {
-        const workbook = await loadTemplate();
-        const ws = workbook.Sheets[workbook.SheetNames[0]];
+    // 更新 B3 日期
+    const startStr = `${startDate.getFullYear()}年${startDate.getMonth()+1}月${startDate.getDate()}日`;
+    const endStr = `${endDate.getMonth()+1}月${endDate.getDate()}日`;
+    setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
 
-        // 更新 B3 日期
-        const startStr = `${startDate.getFullYear()}年${startDate.getMonth()+1}月${startDate.getDate()}日`;
-        const endStr = `${endDate.getMonth()+1}月${endDate.getDate()}日`;
-        setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
+    // 定义映射
+    const cellMapping = {
+        '星期一': [ {cell:'B6', styleFrom:'B5'}, {cell:'B8', styleFrom:'B7'}, {cell:'B11', styleFrom:'B10'}, {cell:'B13', styleFrom:'B12'} ],
+        '星期二': [ {cell:'D6', styleFrom:'D5'}, {cell:'D8', styleFrom:'D7'}, {cell:'D11', styleFrom:'D10'}, {cell:'D13', styleFrom:'D12'} ],
+        '星期三': [ {cell:'F6', styleFrom:'F5'}, {cell:'F8', styleFrom:'F7'}, {cell:'F11', styleFrom:'F10'}, {cell:'F13', styleFrom:'F12'} ],
+        '星期四': [ {cell:'B17', styleFrom:'B16'}, {cell:'B19', styleFrom:'B18'}, {cell:'B22', styleFrom:'B21'}, {cell:'B24', styleFrom:'B23'} ],
+        '星期五': [ {cell:'D17', styleFrom:'D16'}, {cell:'D19', styleFrom:'D18'}, {cell:'D22', styleFrom:'D21'}, {cell:'D24', styleFrom:'D23'} ]
+    };
 
-        // 定义映射
-        const cellMapping = {
-            '星期一': [ {cell:'B6', styleFrom:'B5'}, {cell:'B8', styleFrom:'B7'}, {cell:'B11', styleFrom:'B10'}, {cell:'B13', styleFrom:'B12'} ],
-            '星期二': [ {cell:'D6', styleFrom:'D5'}, {cell:'D8', styleFrom:'D7'}, {cell:'D11', styleFrom:'D10'}, {cell:'D13', styleFrom:'D12'} ],
-            '星期三': [ {cell:'F6', styleFrom:'F5'}, {cell:'F8', styleFrom:'F7'}, {cell:'F11', styleFrom:'F10'}, {cell:'F13', styleFrom:'F12'} ],
-            '星期四': [ {cell:'B17', styleFrom:'B16'}, {cell:'B19', styleFrom:'B18'}, {cell:'B22', styleFrom:'B21'}, {cell:'B24', styleFrom:'B23'} ],
-            '星期五': [ {cell:'D17', styleFrom:'D16'}, {cell:'D19', styleFrom:'D18'}, {cell:'D22', styleFrom:'D21'}, {cell:'D24', styleFrom:'D23'} ]
-        };
+    // 写入 schedule，保证实习生优先，格式为“姓名（电话）、姓名（电话）”
+    const days = Object.keys(cellMapping);
+    days.forEach(day => {
+        const cells = cellMapping[day];
+        schedule[day].forEach((tsObj, i) => {
+            if (!cells[i]) return;
+            const parts = [];
 
-        // 写入 schedule
-        const days = Object.keys(cellMapping);
-        days.forEach(day => {
-            const cells = cellMapping[day];
-            schedule[day].forEach((value, i) => {
-                if (cells[i]) setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
-            });
+            // 实习生先
+            if (tsObj?.intern) {
+                const phone = tsObj.phone?.intern || '';
+                parts.push(`${tsObj.intern}（${phone}）`);
+            }
+            // 高级再
+            if (tsObj?.senior) {
+                const phone = tsObj.phone?.senior || '';
+                parts.push(`${tsObj.senior}（${phone}）`);
+            }
+
+            const value = parts.join(', '); // 多人用逗号分隔
+            setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
         });
+    });
 
-        // 保存 Excel
-        const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(),0,1))/86400000 + new Date(startDate.getFullYear(),0,1).getDay()+1)/7);
-        const filename = `新闻嗅觉图片社${startDate.getMonth()+1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
-        XLSX.writeFile(workbook, filename);
-        console.log("导出 Excel 文件:", filename);
-    }
+    // 自动计算周数
+    const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(),0,1))/86400000 + new Date(startDate.getFullYear(),0,1).getDay()+1)/7);
+    const filename = `新闻嗅觉图片社${startDate.getMonth()+1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
 
+    XLSX.writeFile(workbook, filename);
+    console.log("导出 Excel 文件:", filename);
+}
