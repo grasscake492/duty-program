@@ -86,16 +86,31 @@ function showNotification(message, isError = false) {
     setTimeout(() => notification.classList.remove('show'), 3000);
 }
 
-// 构建提交数据
+// ==================== 构建提交数据 & role 绑定 ====================
+
+// 记录当前选中的身份
 let selectedRole = null;
 
-// 绑定 change 事件
-document.querySelectorAll('input[name="role"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        selectedRole = e.target.value;
-        console.log('当前选中身份:', selectedRole);
+// 绑定 role radio 按钮事件（修改部分）
+function bindRoleRadios() {
+    const radios = document.querySelectorAll('input[name="role"]');
+    radios.forEach(radio => {
+        // 用户选择时更新 selectedRole
+        radio.addEventListener('change', (e) => {
+            selectedRole = e.target.value;
+            console.log('当前选中身份:', selectedRole);
+        });
+
+        // 页面加载时如果有默认选中值，初始化 selectedRole
+        if (radio.checked) {
+            selectedRole = radio.value;
+            console.log('页面加载时默认选中身份:', selectedRole);
+        }
     });
-});
+}
+
+// 确保 DOM 渲染完成后再绑定
+window.addEventListener('DOMContentLoaded', bindRoleRadios);
 
 function buildSubmissionData() {
     const name = document.getElementById('name').value.trim();
@@ -112,7 +127,7 @@ function buildSubmissionData() {
     const submission = {
         name,
         phone,
-        role: selectedRole,       // <- 必须加上 role
+        role: selectedRole,       // <- 确保有值
         availability,
         timestamp: new Date().toISOString()
     };
@@ -169,7 +184,6 @@ async function fetchGitHubIssues() {
 }
 
 // ==================== 过滤函数 ====================
-// 只保留本周提交的数据（剔除所有本周之前提交的）
 function filterThisWeekIssues(issues) {
     const weekStart = getThisWeekStart();
     console.log("本周周一开始时间:", weekStart);
@@ -306,60 +320,3 @@ async function generateScheduleFromGitHub() {
         console.error(err);
         showNotification('生成排班表失败: ' + err.message, true);
     }
-}
-
-function exportScheduleWithTemplate(workbook, schedule, timeSlots, days, startDate, endDate) {
-    const ws = workbook.Sheets[workbook.SheetNames[0]];
-
-    // 根据原模板列位置调整
-    ws['!cols'] = [
-        { wch: 10 }, // A 列 - 时间
-        { wch: 20 }, // B 列 - 星期一姓名/电话
-        { wch: 10 }, // C 列 - 可能的签到列
-        { wch: 20 }, // D 列 - 星期二姓名/电话
-        { wch: 10 }, // E 列 - 签到
-        { wch: 20 }, // F 列 - 星期三姓名/电话
-        { wch: 10 }, // G 列 - 签到
-        // 继续根据模板添加列宽
-    ];
-
-    // 下一周日期写入模板 B3
-    const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
-    const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
-    if (ws['B3']) {
-        ws['B3'].v = `${startStr}-${endStr}`;
-        ws['B3'] = { t: 's', v: `${startStr}-${endStr}` };
-    }
-
-    // 映射表：每一天对应的单元格数组（只写左上角单元格）
-    const cellMapping = {
-        '星期一': ['B6','B8','B11','B13'],
-        '星期二': ['D6','D8','D11','D13'],
-        '星期三': ['F6','F8','F11','F13'],
-        '星期四': ['B17','B19','B22','B24'],
-        '星期五': ['D17','D19','D22','D24']
-    };
-
-    for (const day of days) {
-        const cells = cellMapping[day];
-        if (!cells) continue;
-
-        for (let i = 0; i < schedule[day].length; i++) {
-            const value = schedule[day][i] || '';
-            const firstCell = cells[i]; // 只写左上角
-            if (firstCell) {
-                if (ws[firstCell]) {
-                    ws[firstCell].v = value;   // 只改值，保留边框/横线/样式
-                } else {
-                    ws[firstCell] = { t: 's', v: value };
-                }
-            }
-        }
-    }
-
-    // 保存文件
-    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第x周值班表.xlsx`;
-    console.log("导出 Excel 文件:", filename);
-    XLSX.writeFile(workbook, filename);
-}
-//woc凭什么回滚不了又出bug了，我真的服了
