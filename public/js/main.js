@@ -372,18 +372,13 @@ async function generateScheduleFromGitHub() {
     tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
 
     try {
-        // 拉取 GitHub issues 数据
         const issues = await fetchGitHubIssues();
-
-        // 过滤出本周的 issue
         const thisWeekIssues = filterThisWeekIssues(issues);
         console.log("本周 issues 数:", thisWeekIssues.length);
 
-        // 设置排班表的天数和时间段
-        const days = ['星期一', '星期二', '星期三', '星期四', '星期五'];
-        const timeSlots = ['一二节', '三四节', '五六节', '七八节'];
+        const days = ['星期一','星期二','星期三','星期四','星期五'];
+        const timeSlots = ['一二节','三四节','五六节','七八节'];
 
-        // 初始化排班表
         const schedule = {};
         days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
 
@@ -392,25 +387,22 @@ async function generateScheduleFromGitHub() {
         thisWeekIssues.forEach(issue => {
             try {
                 const data = JSON.parse(issue.body);
-                if (!data.name) return; // 如果没有姓名，跳过
+                if (!data.name) return;
                 const ts = new Date(data.timestamp || issue.created_at || Date.now()).getTime();
-                // 只保留每个人最新的提交
                 if (!latestByName[data.name] || ts > latestByName[data.name].timestamp) {
                     latestByName[data.name] = { ...data, timestamp: ts };
                 }
-            } catch (err) {
-                console.warn("解析 issue 失败:", err);
-            }
+            } catch {}
         });
 
-        const assignedPeople = new Set(); // 用于避免重复排班
+        const assignedPeople = new Set();
 
-        // 开始排班
+        // 排班
         Object.values(latestByName).forEach(p => {
-            if (!p.availability || assignedPeople.has(p.name)) return; // 如果没有可用时间或者已排班，跳过
+            if (!p.availability || assignedPeople.has(p.name)) return;
             let placed = false;
 
-            // 优先空格排班
+            // 优先空格
             p.availability.sort(slot => {
                 const day = slot.day;
                 const timeIdx = timeSlots.indexOf(slot.time);
@@ -418,30 +410,31 @@ async function generateScheduleFromGitHub() {
                 return cell ? 1 : -1; // 空格排前
             });
 
-            // 遍历可用时间，尽量安排到空位
             for (const slot of p.availability) {
                 const dayIndex = days.indexOf(slot.day);
                 const timeIndex = timeSlots.indexOf(slot.time);
-                if (dayIndex < 0 || timeIndex < 0) continue; // 排除无效的日期或时间
+                if (dayIndex < 0 || timeIndex < 0) continue;
 
                 const cell = schedule[slot.day][timeIndex];
                 if (!cell) {
-                    schedule[slot.day][timeIndex] = { intern: null, senior: null }; // 初始化空格
+                    schedule[slot.day][timeIndex] = { intern: null, senior: null };
                 }
 
                 const tsObj = schedule[slot.day][timeIndex];
-                const role = p.role || 'intern'; // 默认是实习生
+                const role = p.role || 'intern';
 
-                // 如果该角色位置为空，则安排
                 if (!tsObj[role]) {
-                    tsObj[role] = p.name; // 填充姓名
-                    assignedPeople.add(p.name); // 标记已排班
+                    tsObj[role] = p.name;
+                    assignedPeople.add(p.name);
                     placed = true;
                     break;
                 }
             }
 
-            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`); // 如果没有合适的时间，输出警告
+            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
+
+            // 打印已排班 issue 的数据上传时间
+            console.log(`已排班: ${p.name} (${p.role})，上传时间: ${new Date(p.timestamp).toLocaleString()}`);
         });
 
         // --- 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）" ---
