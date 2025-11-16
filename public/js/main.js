@@ -255,6 +255,7 @@ async function loadTemplate() {
     return XLSX.read(arrayBuffer, { type: 'array' });
 }
 
+/*
 // ==================== 排班生成 ====================
 async function generateScheduleFromGitHub() {
     const tableBody = document.querySelector('#schedule-table tbody');
@@ -363,7 +364,126 @@ async function generateScheduleFromGitHub() {
         showNotification('生成排班表失败: ' + err.message, true);
     }
 }
+*/
 
+// ==================== 排班生成 ====================
+async function generateScheduleFromGitHub() {
+    const tableBody = document.querySelector('#schedule-table tbody');
+    tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
+
+    try {
+        // 拉取 GitHub issues 数据
+        const issues = await fetchGitHubIssues();
+
+        // 过滤出本周的 issue
+        const thisWeekIssues = filterThisWeekIssues(issues);
+        console.log("本周 issues 数:", thisWeekIssues.length);
+
+        // 设置排班表的天数和时间段
+        const days = ['星期一', '星期二', '星期三', '星期四', '星期五'];
+        const timeSlots = ['一二节', '三四节', '五六节', '七八节'];
+
+        // 初始化排班表
+        const schedule = {};
+        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
+
+        // 构建最新提交字典，用于查手机号
+        const latestByName = {};
+        thisWeekIssues.forEach(issue => {
+            try {
+                const data = JSON.parse(issue.body);
+                if (!data.name) return; // 如果没有姓名，跳过
+                const ts = new Date(data.timestamp || issue.created_at || Date.now()).getTime();
+                // 只保留每个人最新的提交
+                if (!latestByName[data.name] || ts > latestByName[data.name].timestamp) {
+                    latestByName[data.name] = { ...data, timestamp: ts };
+                }
+            } catch (err) {
+                console.warn("解析 issue 失败:", err);
+            }
+        });
+
+        const assignedPeople = new Set(); // 用于避免重复排班
+
+        // 开始排班
+        Object.values(latestByName).forEach(p => {
+            if (!p.availability || assignedPeople.has(p.name)) return; // 如果没有可用时间或者已排班，跳过
+            let placed = false;
+
+            // 优先空格排班
+            p.availability.sort(slot => {
+                const day = slot.day;
+                const timeIdx = timeSlots.indexOf(slot.time);
+                const cell = schedule[day]?.[timeIdx];
+                return cell ? 1 : -1; // 空格排前
+            });
+
+            // 遍历可用时间，尽量安排到空位
+            for (const slot of p.availability) {
+                const dayIndex = days.indexOf(slot.day);
+                const timeIndex = timeSlots.indexOf(slot.time);
+                if (dayIndex < 0 || timeIndex < 0) continue; // 排除无效的日期或时间
+
+                const cell = schedule[slot.day][timeIndex];
+                if (!cell) {
+                    schedule[slot.day][timeIndex] = { intern: null, senior: null }; // 初始化空格
+                }
+
+                const tsObj = schedule[slot.day][timeIndex];
+                const role = p.role || 'intern'; // 默认是实习生
+
+                // 如果该角色位置为空，则安排
+                if (!tsObj[role]) {
+                    tsObj[role] = p.name; // 填充姓名
+                    assignedPeople.add(p.name); // 标记已排班
+                    placed = true;
+                    break;
+                }
+            }
+
+            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`); // 如果没有合适的时间，输出警告
+        });
+
+        // --- 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）" ---
+        tableBody.innerHTML = '';
+        let emptyCount = 0;
+
+        for (let ti = 0; ti < timeSlots.length; ti++) {
+            const row = document.createElement('tr');
+            const timeCell = document.createElement('td');
+            timeCell.textContent = timeSlots[ti];
+            row.appendChild(timeCell);
+
+            days.forEach(d => {
+                const cell = document.createElement('td');
+                const tsObj = schedule[d][ti];
+                const valArr = [];
+
+                // 实习生优先
+                if (tsObj?.intern) {
+                    const phone = latestByName[tsObj.intern]?.phone || '';
+                    valArr.push(`${tsObj.intern}（${phone}）`);
+                }
+                if (tsObj?.senior) {
+                    const phone = latestByName[tsObj.senior]?.phone || '';
+                    valArr.push(`${tsObj.senior}（${phone}）`);
+                }
+
+                if (!valArr.length) emptyCount++;
+                cell.textContent = valArr.join(', '); // 拼接成 "xxx（电话）, xxx（电话）"
+                row.appendChild(cell);
+            });
+
+            tableBody.appendChild(row);
+        }
+
+        showNotification(`排班表生成成功，无人值班节数: ${emptyCount}`);
+
+    } catch (err) {
+        console.error(err);
+        showNotification('生成排班表失败: ' + err.message, true);
+    }
+}
 
 <!--excel生成函数-->
 async function exportScheduleWithTemplate(schedule, startDate, endDate) {
