@@ -372,13 +372,17 @@ async function generateScheduleFromGitHub() {
     tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
 
     try {
+        // 获取所有 GitHub Issues
         const issues = await fetchGitHubIssues();
+
+        // 获取本周上传的 Issues，排除上周及之前的
         const thisWeekIssues = filterThisWeekIssues(issues);
         console.log("本周 issues 数:", thisWeekIssues.length);
 
-        const days = ['星期一','星期二','星期三','星期四','星期五'];
-        const timeSlots = ['一二节','三四节','五六节','七八节'];
+        const days = ['星期一', '星期二', '星期三', '星期四', '星期五'];
+        const timeSlots = ['一二节', '三四节', '五六节', '七八节'];
 
+        // 初始化排班表
         const schedule = {};
         days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
 
@@ -437,7 +441,7 @@ async function generateScheduleFromGitHub() {
             console.log(`已排班: ${p.name} (${p.role})，上传时间: ${new Date(p.timestamp).toLocaleString()}`);
         });
 
-        // --- 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）" ---
+        // 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）"
         tableBody.innerHTML = '';
         let emptyCount = 0;
 
@@ -477,6 +481,35 @@ async function generateScheduleFromGitHub() {
         showNotification('生成排班表失败: ' + err.message, true);
     }
 }
+
+// ==================== 过滤本周数据 ====================
+function filterThisWeekIssues(issues) {
+    const now = new Date();
+    const startOfWeek = getThisWeekStart(); // 本周一 00:00:00
+
+    return issues.filter(issue => {
+        try {
+            const data = JSON.parse(issue.body);
+            const ts = new Date(data.timestamp || issue.created_at || Date.now());
+            return ts >= startOfWeek;
+        } catch (err) {
+            console.warn("解析 issue.body 失败:", issue.body);
+            return false;
+        }
+    });
+}
+
+// 获取本周一的日期
+function getThisWeekStart() {
+    const now = new Date();
+    const day = now.getDay(); // 0=周日, 1=周一...
+    const diffToMonday = (day === 0 ? -6 : 1 - day); // 计算本周一与今天的差值
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+}
+
 
 <!--excel生成函数-->
 async function exportScheduleWithTemplate(schedule, startDate, endDate) {
