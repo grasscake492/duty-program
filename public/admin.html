@@ -847,6 +847,71 @@
             });
         });
     });
+    <!--excel生成函数-->
+    async function exportScheduleWithTemplate(schedule, startDate, endDate) {
+        const workbook = await loadTemplate();
+        const ws = workbook.Sheets[workbook.SheetNames[0]];
+
+        // 更新 B3 日期
+        const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
+        const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
+        setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
+
+        // 定义映射
+        const cellMapping = {
+            '星期一': [{cell: 'B6', styleFrom: 'B5'}, {cell: 'B8', styleFrom: 'B7'}, {
+                cell: 'B11',
+                styleFrom: 'B10'
+            }, {cell: 'B13', styleFrom: 'B12'}],
+            '星期二': [{cell: 'D6', styleFrom: 'D5'}, {cell: 'D8', styleFrom: 'D7'}, {
+                cell: 'D11',
+                styleFrom: 'D10'
+            }, {cell: 'D13', styleFrom: 'D12'}],
+            '星期三': [{cell: 'F6', styleFrom: 'F5'}, {cell: 'F8', styleFrom: 'F7'}, {
+                cell: 'F11',
+                styleFrom: 'F10'
+            }, {cell: 'F13', styleFrom: 'F12'}],
+            '星期四': [{cell: 'B17', styleFrom: 'B16'}, {cell: 'B19', styleFrom: 'B18'}, {
+                cell: 'B22',
+                styleFrom: 'B21'
+            }, {cell: 'B24', styleFrom: 'B23'}],
+            '星期五': [{cell: 'D17', styleFrom: 'D16'}, {cell: 'D19', styleFrom: 'D18'}, {
+                cell: 'D22',
+                styleFrom: 'D21'
+            }, {cell: 'D24', styleFrom: 'D23'}]
+        };
+
+        // 写入 schedule，保证实习生优先，格式为“姓名（电话）、姓名（电话）”
+        const days = Object.keys(cellMapping);
+        days.forEach(day => {
+            const cells = cellMapping[day];
+            schedule[day].forEach((tsObj, i) => {
+                if (!cells[i]) return;
+                const parts = [];
+
+                // 实习生先
+                if (tsObj?.intern) {
+                    const phone = tsObj.phone?.intern || '';
+                    parts.push(`${tsObj.intern}（${phone}）`);
+                }
+                // 高级再
+                if (tsObj?.senior) {
+                    const phone = tsObj.phone?.senior || '';
+                    parts.push(`${tsObj.senior}（${phone}）`);
+                }
+
+                const value = parts.join(', '); // 多人用逗号分隔
+                setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
+            });
+        });
+
+        // 自动计算周数
+        const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(), 0, 1)) / 86400000 + new Date(startDate.getFullYear(), 0, 1).getDay() + 1) / 7);
+        const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
+
+        XLSX.writeFile(workbook, filename);
+        console.log("导出 Excel 文件:", filename);
+    }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
