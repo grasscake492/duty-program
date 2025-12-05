@@ -635,34 +635,41 @@
         }
     }
 
-    // ==================== 过滤本周数据 ====================
-    function filterThisWeekIssues(issues) {
+    // 下周范围（周一到周五）
+    function getNextWeekRange() {
         const now = new Date();
-        const startOfWeek = getThisWeekStart(); // 本周一 00:00:00
+        const day = now.getDay(); // 0=周日,1=周一
+        const diffToMonday = (day === 0 ? 1 : 8 - day);
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + diffToMonday);
+        monday.setHours(0, 0, 0, 0);
 
-        return issues.filter(issue => {
-            try {
-                const data = JSON.parse(issue.body);
-                const ts = new Date(data.timestamp || issue.created_at || Date.now());
-                return ts >= startOfWeek;
-            } catch (err) {
-                console.warn("解析 issue.body 失败:", issue.body);
-                return false;
-            }
-        });
+        const friday = new Date(monday);
+        friday.setDate(monday.getDate() + 4);
+        friday.setHours(23, 59, 59, 999);
+
+        return { monday, friday };
     }
 
-    // 获取本周一的日期
+    // 本周周一 00:00:00
     function getThisWeekStart() {
         const now = new Date();
-        const day = now.getDay(); // 0=周日, 1=周一...
-        const diffToMonday = (day === 0 ? -6 : 1 - day); // 计算本周一与今天的差值
+        const day = now.getDay(); // 0=周日,1=周一...
+        const diffToMonday = (day === 0 ? -6 : 1 - day);
         const monday = new Date(now);
         monday.setDate(now.getDate() + diffToMonday);
         monday.setHours(0, 0, 0, 0);
         return monday;
     }
 
+    // UI 通知
+    function showNotification(message, isError = false) {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = 'notification' + (isError ? ' error' : '');
+        notification.classList.add('show');
+        setTimeout(() => notification.classList.remove('show'), 3000);
+    }
 
 
     // ==================== 提交函数部分 ====================
