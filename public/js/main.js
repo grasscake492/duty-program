@@ -452,6 +452,8 @@ async function exportScheduleWithTemplate(schedule, startDate, endDate) {
     console.log("导出 Excel 文件:", filename);
 }
 */
+
+
 // ==================== GitHub 配置 ====================
 const GITHUB_CONFIG = {
     owner: 'grasscake492',
@@ -499,6 +501,21 @@ async function loginAsAdmin() {
 }
 
 // ==================== 工具函数 ====================
+// 切换 tab 内容
+function switchTab(tabId) {
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // 移除所有 tab 的 active 类
+    tabs.forEach(tab => tab.classList.remove('active'));
+    tabContents.forEach(content => content.classList.remove('active'));
+
+    // 给点击的 tab 添加 active 类
+    document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+
+    // 显示对应的 tab 内容
+    document.getElementById(tabId).classList.add('active');
+}
 
 // 获取本周一的日期
 function getThisWeekStart() {
