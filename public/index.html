@@ -66,7 +66,7 @@
 <script>
     // 游客直接进入游客页面
     function loginAsGuest() {
-        window.location.href = "/guest.html";
+        window.location.href = "guest.html";
     }
 
     // 点击“管理员登录”按钮时显示输入框
@@ -92,7 +92,7 @@
         const data = await res.json();
 
         if (data.success) {
-            window.location.href = "/admin.html";
+            window.location.href = "admin.html";
         } else {
             alert("账号或密码错误！");
         }

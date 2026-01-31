@@ -634,6 +634,27 @@ async function submitToBackend() {
         submitButton.disabled = false;
     }
 }
+//================查看GitHub
+async function viewGitHubIssues() {
+    try {
+        // 拉取 GitHub 的 Issues 数据
+        const issues = await fetchGitHubIssues();
+        const issuesList = document.getElementById("issues-list");
+        issuesList.innerHTML = "";  // 清空现有的列表
+
+        if (issues.length === 0) {
+            issuesList.textContent = "没有找到任何 Issues";
+        } else {
+            issues.forEach(issue => {
+                const issueItem = document.createElement("li");
+                issueItem.textContent = issue.title;
+                issuesList.appendChild(issueItem);
+            });
+        }
+    } catch (error) {
+        console.error("获取 GitHub Issues 时发生错误:", error);
+    }
+}
 
 // ==================== GitHub 数据操作 ====================
 
