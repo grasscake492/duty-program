@@ -7,7 +7,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# 本地环境变量
+# 本地环境变量 (重要！防止管理员密码泄露)
 .env
 .env.local
 .env.*.local
@@ -25,13 +25,11 @@ desktop.ini
 .idea/
 *.swp
 
-# 构建输出（如果有的话）
+# 构建输出
 dist/
 build/
 .next/
 out/
-
-# Vercel 本地配置文件（远程部署用 vercel.json 就行）
 .vercel
 
 # 缓存文件
@@ -39,5 +37,18 @@ out/
 *.tmp
 *.temp
 
-# 可能的图标/本地生成的文件
-*.ico
+# ==========================
+# 图片社排班系统专用忽略规则
+# ==========================
+
+# 1. 忽略用户提交的所有数据 (包含隐私：姓名、电话)
+data/weeks/
+
+# 2. 忽略生成的排班 Excel 文件
+output/
+
+# 3. 忽略运行时的排班计划配置 (防止本地测试覆盖服务器配置)
+data/active_schedule.json
+data/config.json
+
+# 注意：template/ 文件夹千万不要忽略，因为里面存着 template.xlsx 模板，是代码运行必须的！

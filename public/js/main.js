@@ -1,853 +1,367 @@
-/*
-// ==================== GitHub 配置 ====================
-const GITHUB_CONFIG = {
-    owner: 'grasscake492',
-    repo: 'duty-program',
-    labels: ['scheduling', 'submission']
-};
+let sysConfig = null;
+const weekDaysMap = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 
-// ==================== 登录逻辑区域 ====================
+// 初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadConfig();
 
-// 游客直接进入游客页面
-function loginAsGuest() {
-    window.location.href = "/guest.html";
+    // 1. 游客页面渲染
+    if (document.getElementById('guest-schedule-container')) {
+        renderGrid('guest-schedule-container', { interactive: true });
+        bindSubmitEvent('guest-schedule-container');
+    }
+
+    // 2. 管理员页面渲染 (Tab 1)
+    if (document.getElementById('admin-fill-grid')) {
+        renderGrid('admin-fill-grid', { interactive: true });
+        bindSubmitEvent('admin-fill-grid');
+    }
+});
+
+// ================== 1. 配置加载 (修复 Undefined 问题) ==================
+async function loadConfig() {
+    try {
+        const res = await fetch('/api/config');
+        sysConfig = await res.json();
+
+        const titleEl = document.getElementById('week-display-title'); // Admin 标题
+        const weekInfoEl = document.getElementById('week-info');       // Guest 标题
+        const guestBtn = document.getElementById('submit-btn');        // Guest 按钮
+
+        let text = "";
+
+        if (!sysConfig.isSet) {
+            text = `<span style="color:#e74c3c;">管理员尚未创建排班计划</span>`;
+            if(guestBtn) { guestBtn.disabled = true; guestBtn.innerText = "暂无计划"; }
+        } else {
+            // ⭐ 修复关键：读取正确的 weekName 字段
+            text = `当前目标：<span style="color:#3498db;font-weight:bold;">${sysConfig.weekName}</span> <span style="font-size:0.85em;color:#666">(${sysConfig.startDate} 至 ${sysConfig.endDate})</span>`;
+            if(guestBtn) { guestBtn.disabled = false; guestBtn.innerText = "提交排班"; }
+        }
+
+        if(titleEl) titleEl.innerHTML = text;
+        if(weekInfoEl) weekInfoEl.innerHTML = text;
+
+    } catch (e) {
+        console.error("加载配置失败", e);
+    }
 }
 
-// 点击“管理员登录”按钮时显示输入框
-function toggleAdminLogin() {
-    const adminBox = document.getElementById("admin-login");
-    if (adminBox.style.display === "none" || adminBox.style.display === "") {
-        adminBox.style.display = "block";
+// ================== 2. 超级通用的网格渲染函数 ==================
+/**
+ * @param {string} containerId 容器ID
+ * @param {Object} options 配置项 { interactive: boolean, userData: Object }
+ */
+function renderGrid(containerId, options = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // 如果没配置，显示提示
+    if (!sysConfig || !sysConfig.isSet || !sysConfig.selectedDays) {
+        container.innerHTML = '<p style="grid-column:1/-1; text-align:center; padding:20px; color:#999;">暂无排班计划</p>';
+        return;
+    }
+
+    const days = sysConfig.selectedDays; // [{date, dayOfWeek}, ...]
+    const times = ["一二节", "三四节", "五六节", "七八节"];
+
+    // 设置 CSS Grid
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = `80px repeat(${days.length}, 1fr)`;
+    container.style.gap = '8px'; // 稍微大一点间距更好看
+
+    let html = `<div class="time-slot" style="background:#34495e; color:white; padding:10px; text-align:center; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:bold;">时间</div>`;
+
+    // 表头
+    days.forEach(d => {
+        const shortDate = d.date.substring(5);
+        html += `<div class="day-header" style="background:#2c3e50; color:white; padding:10px; text-align:center; border-radius:6px; font-weight:bold;">
+                    ${d.dayOfWeek}<br><span style="font-size:12px; font-weight:normal; opacity:0.8">${shortDate}</span>
+                 </div>`;
+    });
+
+    // 单元格
+    times.forEach(time => {
+        html += `<div class="time-slot" style="background:#34495e; color:white; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:bold;">${time}</div>`;
+
+        days.forEach(d => {
+            // 检查是否需要高亮 (用于 Tab 2 查看模式)
+            let isSelected = false;
+            if (options.userData && options.userData.availability) {
+                // 比对 date 和 time
+                isSelected = options.userData.availability.some(
+                    slot => slot.date === d.date && slot.time === time
+                );
+            }
+
+            const activeClass = isSelected ? 'selected' : '';
+            const activeText = isSelected ? '已选' : '空闲';
+            const baseStyle = `background:${isSelected ? '#2ecc71' : '#ecf0f1'}; color:${isSelected ? 'white' : '#7f8c8d'};`;
+            const cursorStyle = options.interactive ? 'cursor:pointer;' : 'cursor:default;';
+
+            html += `<div class="schedule-cell ${activeClass}" 
+                          data-time="${time}" data-day="${d.dayOfWeek}" data-date="${d.date}" 
+                          style="${baseStyle} ${cursorStyle} height:60px; display:flex; align-items:center; justify-content:center; border-radius:6px; user-select:none; font-weight:${isSelected?'bold':'normal'}; transition:all 0.2s;">
+                          ${activeText}
+                     </div>`;
+        });
+    });
+
+    container.innerHTML = html;
+
+    // 只有交互模式下才绑定点击事件
+    if (options.interactive) {
+        container.querySelectorAll('.schedule-cell').forEach(cell => {
+            cell.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                if(this.classList.contains('selected')) {
+                    this.style.background = '#2ecc71';
+                    this.style.color = 'white';
+                    this.style.fontWeight = 'bold';
+                    this.textContent = '已选';
+                    this.style.transform = 'scale(1.05)';
+                    this.style.boxShadow = '0 2px 8px rgba(46,204,113,0.4)';
+                } else {
+                    this.style.background = '#ecf0f1';
+                    this.style.color = '#7f8c8d';
+                    this.style.fontWeight = 'normal';
+                    this.textContent = '空闲';
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = 'none';
+                }
+            });
+        });
+    }
+}
+
+// ================== 3. 提交逻辑 ==================
+function bindSubmitEvent(gridContainerId) {
+    let submitBtn;
+    // 区分 Guest 页面和 Admin 页面
+    if (gridContainerId === 'admin-fill-grid') {
+        submitBtn = document.querySelector('#user #submit-btn');
     } else {
-        adminBox.style.display = "none";
+        submitBtn = document.getElementById('submit-btn');
     }
-}
 
-// 管理员登录验证
-async function loginAsAdmin() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
+    if (!submitBtn) return;
 
-    try {
-        const res = await fetch("/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
+    submitBtn.addEventListener('click', async () => {
+        let name, phone, roleRadio;
 
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-            alert("管理员登录成功！");
-            window.location.href = "/admin.html";
+        if (gridContainerId === 'admin-fill-grid') {
+            name = document.querySelector('#user #name').value.trim();
+            phone = document.querySelector('#user #phone').value.trim();
+            roleRadio = document.querySelector('#user input[name="role"]:checked');
         } else {
-            alert(data.error || "账号或密码错误！");
+            name = document.getElementById('name').value.trim();
+            phone = document.getElementById('phone').value.trim();
+            roleRadio = document.querySelector('input[name="role"]:checked');
         }
-    } catch (err) {
-        console.error("登录错误：", err);
-        alert("服务器连接失败，请稍后再试。");
-    }
-}
 
-// ==================== 工具函数 ====================
+        if (!name || !phone || !roleRadio) return alert("请完整填写姓名、手机号和身份！");
 
-// 下周范围（周一到周五）
-function getNextWeekRange() {
-    const now = new Date();
-    const day = now.getDay(); // 0=周日,1=周一
-    const diffToMonday = (day === 0 ? 1 : 8 - day);
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
+        const container = document.getElementById(gridContainerId);
+        const selectedCells = container.querySelectorAll('.schedule-cell.selected');
 
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    friday.setHours(23, 59, 59, 999);
+        if (selectedCells.length === 0) return alert("请至少勾选一个时间段！");
 
-    return { monday, friday };
-}
-
-// 本周周一 00:00:00
-function getThisWeekStart() {
-    const now = new Date();
-    const day = now.getDay(); // 0=周日,1=周一...
-    const diffToMonday = (day === 0 ? -6 : 1 - day);
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-}
-
-// UI 通知
-function showNotification(message, isError = false) {
-    const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.className = 'notification' + (isError ? ' error' : '');
-    notification.classList.add('show');
-    setTimeout(() => notification.classList.remove('show'), 3000);
-}
-
-// ==================== 构建提交数据 & role 绑定 ====================
-
-// 构建提交数据
-let selectedRole = null;
-
-// 绑定 role radio 按钮事件
-function bindRoleRadios() {
-    const radios = document.querySelectorAll('input[name="role"]');
-    radios.forEach(radio => {
-        // 用户选择时更新 selectedRole
-        radio.addEventListener('change', (e) => {
-            selectedRole = e.target.value;
-            console.log('当前选中身份:', selectedRole);
-        });
-
-        // 页面加载时如果有默认选中值，初始化 selectedRole
-        if (radio.checked) {
-            selectedRole = radio.value;
-            console.log('页面加载时默认选中身份:', selectedRole);
-        }
-    });
-}
-
-// 页面加载完成后绑定
-document.addEventListener('DOMContentLoaded', bindRoleRadios);
-
-
-// 确保 DOM 渲染完成后再绑定
-
-function buildSubmissionData() {
-    const name = document.getElementById('name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-
-    const availability = [];
-    document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
-        availability.push({
+        const availability = Array.from(selectedCells).map(cell => ({
             day: cell.getAttribute('data-day'),
+            date: cell.getAttribute('data-date'),
             time: cell.getAttribute('data-time')
-        });
-    });
+        }));
 
-    const submission = {
-        name,
-        phone,
-        role: selectedRole,       // <- 确保有值
-        availability,
-        timestamp: new Date().toISOString()
-    };
+        const payload = {
+            name, phone, role: roleRadio.value,
+            week: sysConfig.weekName,
+            availability
+        };
 
-    console.log("构建的提交数据:", submission);
-    return submission;
-}
-
-// ==================== 提交数据 ====================
-async function submitToBackend() {
-    const submissionData = buildSubmissionData();
-    const errors = validateSubmissionData(submissionData);
-    if (errors.length > 0) {
-        showNotification(errors[0], true);
-        return;
-    }
-
-    const submitButton = document.getElementById('submit-btn');
-    submitButton.disabled = true;
-
-    try {
-        const response = await fetch('/api/create-issue', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submissionData)
-        });
-
-        const result = await response.json();
-        console.log("提交结果:", result);
-
-        if (response.ok && result.success) {
-            showNotification('提交成功！数据已保存');
-            clearForm();
-            if (result.issueUrl) window.open(result.issueUrl, '_blank');
-        } else {
-            throw new Error(result.error || '提交失败');
-        }
-    } catch (err) {
-        console.error(err);
-        showNotification('提交失败: ' + err.message, true);
-    } finally {
-        submitButton.disabled = false;
-    }
-}
-
-// ==================== GitHub 数据操作 ====================
-async function fetchGitHubIssues() {
-    const response = await fetch('/api/fetch-issues');
-    if (!response.ok) throw new Error('拉取 GitHub Issues 失败');
-
-    const issues = await response.json();
-
-    // 解析 JSON body
-    const parsed = issues.map(issue => {
         try {
-            const data = JSON.parse(issue.body);
-            if (!data.name || !data.phone || !data.role || !data.availability) return null;
-            data.timestamp = new Date(data.timestamp || issue.created_at);
-            data.html_url = issue.html_url;
-            return data;
-        } catch (err) {
-            console.warn('解析 Issue body 失败', issue.html_url);
-            return null;
-        }
-    }).filter(Boolean);
+            submitBtn.disabled = true;
+            submitBtn.innerText = "提交中...";
 
-    return parsed;
-}
+            const res = await fetch('/api/submit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
 
-
-// ==================== 过滤函数 ====================
-function filterThisWeekIssues(issues) {
-    const weekStart = getThisWeekStart();
-    console.log("本周周一开始时间:", weekStart);
-
-    return issues.filter(issue => {
-        try {
-            const data = JSON.parse(issue.body);
-            const ts = new Date(data.timestamp);
-            const keep = ts >= weekStart;
-            console.log(`过滤 issue ${issue.id} 时间:`, ts, "是否保留:", keep);
-            return keep;
-        } catch (err) {
-            console.warn("解析 issue.body 失败:", issue.body);
-            return false;
+            if (result.success) {
+                alert("提交成功！");
+                if (gridContainerId !== 'admin-fill-grid') {
+                    window.location.reload();
+                } else {
+                    // Admin 填表后只清空数据，不刷新
+                    selectedCells.forEach(c => c.click()); // 反选
+                    document.querySelector('#user #name').value = '';
+                    document.querySelector('#user #phone').value = '';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "提交排班";
+                }
+            } else {
+                alert("失败: " + result.error);
+                submitBtn.disabled = false;
+            }
+        } catch (e) {
+            alert("网络错误");
+            submitBtn.disabled = false;
         }
     });
 }
 
-// ==================== 查看 Issues ====================
-async function viewIssues() {
-    try {
-        const issues = await fetchGitHubIssues();
-        const thisWeekIssues = filterThisWeekIssues(issues);
+// ================== 4. Admin 功能 (查看详情 & 生成) ==================
 
-        const container = document.getElementById('issues-list');
+// 加载已提交名单 (Tab 2)
+window.loadSubmittedData = async function() {
+    if (!sysConfig || !sysConfig.isSet) return alert("无排班计划");
+    try {
+        const res = await fetch('/api/admin/week-data');
+        const result = await res.json();
+
+        const container = document.getElementById('submitted-list-view');
+        const detailArea = document.getElementById('user-detail-view');
+        if(!container) return;
+
         container.innerHTML = '';
+        detailArea.style.display = 'none'; // 隐藏详情区
 
-        if (thisWeekIssues.length === 0) {
-            container.textContent = '本周暂无提交记录';
-            return;
-        }
+        if (result.success && result.data.length > 0) {
+            result.data.forEach(user => {
+                const tag = document.createElement('div');
+                tag.className = 'user-tag';
+                tag.innerText = `${user.name}`;
 
-        const list = document.createElement('ul');
-        thisWeekIssues.forEach(issue => {
-            const li = document.createElement('li');
-            li.innerHTML = `<a href="${issue.html_url}" target="_blank">${issue.title}</a> - ${issue.created_at}`;
-            list.appendChild(li);
-        });
-        container.appendChild(list);
-    } catch (err) {
-        console.error(err);
-        showNotification('拉取 Issues 失败: ' + err.message, true);
-    }
-}
+                // 点击查看详情逻辑
+                tag.onclick = () => {
+                    document.querySelectorAll('.user-tag').forEach(t => t.classList.remove('active-tag'));
+                    tag.classList.add('active-tag');
 
-// ==================== 模板读取 ====================
-async function loadTemplate() {
-    const response = await fetch('/schedule_template.xlsx');
-    if (!response.ok) throw new Error('模板文件加载失败');
-    const arrayBuffer = await response.arrayBuffer();
-    return XLSX.read(arrayBuffer, { type: 'array' });
-}
+                    // 显示详情区域
+                    detailArea.style.display = 'block';
+                    document.getElementById('detail-name').innerText = user.name;
 
-// ==================== 排班生成 ====================
-async function generateScheduleFromGitHub() {
-    const tableBody = document.querySelector('#schedule-table tbody');
-    tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
-
-    try {
-        // 获取所有 GitHub Issues
-        const issues = await fetchGitHubIssues();
-
-        // 获取本周上传的 Issues，排除上周及之前的
-        const thisWeekIssues = filterThisWeekIssues(issues);
-        console.log("本周 issues 数:", thisWeekIssues.length);
-
-        const days = ['星期一', '星期二', '星期三', '星期四', '星期五'];
-        const timeSlots = ['一二节', '三四节', '五六节', '七八节'];
-
-        // 初始化排班表
-        const schedule = {};
-        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
-
-        // 构建最新提交字典，用于查手机号
-        const latestByName = {};
-        thisWeekIssues.forEach(issue => {
-            try {
-                const data = JSON.parse(issue.body);
-                if (!data.name) return;
-                const ts = new Date(data.timestamp || issue.created_at || Date.now()).getTime();
-                if (!latestByName[data.name] || ts > latestByName[data.name].timestamp) {
-                    latestByName[data.name] = { ...data, timestamp: ts };
-                }
-            } catch {}
-        });
-
-        const assignedPeople = new Set();
-
-        // 排班
-        Object.values(latestByName).forEach(p => {
-            if (!p.availability || assignedPeople.has(p.name)) return;
-            let placed = false;
-
-            // 优先空格
-            p.availability.sort(slot => {
-                const day = slot.day;
-                const timeIdx = timeSlots.indexOf(slot.time);
-                const cell = schedule[day]?.[timeIdx];
-                return cell ? 1 : -1; // 空格排前
+                    // 调用通用渲染器，传入用户数据，生成只读网格
+                    renderGrid('readonly-view-grid', { interactive: false, userData: user });
+                };
+                container.appendChild(tag);
             });
-
-            for (const slot of p.availability) {
-                const dayIndex = days.indexOf(slot.day);
-                const timeIndex = timeSlots.indexOf(slot.time);
-                if (dayIndex < 0 || timeIndex < 0) continue;
-
-                const cell = schedule[slot.day][timeIndex];
-                if (!cell) {
-                    schedule[slot.day][timeIndex] = { intern: null, senior: null };
-                }
-
-                const tsObj = schedule[slot.day][timeIndex];
-                const role = p.role || 'intern';
-
-                if (!tsObj[role]) {
-                    tsObj[role] = p.name;
-                    assignedPeople.add(p.name);
-                    placed = true;
-                    break;
-                }
-            }
-
-            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
-
-            // 打印已排班 issue 的数据上传时间
-            console.log(`已排班: ${p.name} (${p.role})，上传时间: ${new Date(p.timestamp).toLocaleString()}`);
-        });
-
-        // 渲染表格，显示 "xxx（电话号码）、xxx（电话号码）"
-        tableBody.innerHTML = '';
-        let emptyCount = 0;
-
-        for (let ti = 0; ti < timeSlots.length; ti++) {
-            const row = document.createElement('tr');
-            const timeCell = document.createElement('td');
-            timeCell.textContent = timeSlots[ti];
-            row.appendChild(timeCell);
-
-            days.forEach(d => {
-                const cell = document.createElement('td');
-                const tsObj = schedule[d][ti];
-                const valArr = [];
-
-                // 实习生优先
-                if (tsObj?.intern) {
-                    const phone = latestByName[tsObj.intern]?.phone || '';
-                    valArr.push(`${tsObj.intern}（${phone}）`);
-                }
-                if (tsObj?.senior) {
-                    const phone = latestByName[tsObj.senior]?.phone || '';
-                    valArr.push(`${tsObj.senior}（${phone}）`);
-                }
-
-                if (!valArr.length) emptyCount++;
-                cell.textContent = valArr.join(', '); // 拼接成 "xxx（电话）, xxx（电话）"
-                row.appendChild(cell);
-            });
-
-            tableBody.appendChild(row);
+        } else {
+            container.innerHTML = '<p style="color:#999">暂无提交数据</p>';
         }
-
-        showNotification(`排班表生成成功，无人值班节数: ${emptyCount}`);
-
-    } catch (err) {
-        console.error(err);
-        showNotification('生成排班表失败: ' + err.message, true);
-    }
-}
-
-// ==================== 过滤本周数据 ====================
-function filterThisWeekIssues(issues) {
-    const now = new Date();
-    const startOfWeek = getThisWeekStart(); // 本周一 00:00:00
-
-    return issues.filter(issue => {
-        try {
-            const data = JSON.parse(issue.body);
-            const ts = new Date(data.timestamp || issue.created_at || Date.now());
-            return ts >= startOfWeek;
-        } catch (err) {
-            console.warn("解析 issue.body 失败:", issue.body);
-            return false;
-        }
-    });
-}
-
-// 获取本周一的日期
-function getThisWeekStart() {
-    const now = new Date();
-    const day = now.getDay(); // 0=周日, 1=周一...
-    const diffToMonday = (day === 0 ? -6 : 1 - day); // 计算本周一与今天的差值
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-}
-
-
-<!--excel生成函数-->
-async function exportScheduleWithTemplate(schedule, startDate, endDate) {
-    const workbook = await loadTemplate();
-    const ws = workbook.Sheets[workbook.SheetNames[0]];
-
-    // 更新 B3 日期
-    const startStr = `${startDate.getFullYear()}年${startDate.getMonth()+1}月${startDate.getDate()}日`;
-    const endStr = `${endDate.getMonth()+1}月${endDate.getDate()}日`;
-    setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
-
-    // 定义映射
-    const cellMapping = {
-        '星期一': [ {cell:'B6', styleFrom:'B5'}, {cell:'B8', styleFrom:'B7'}, {cell:'B11', styleFrom:'B10'}, {cell:'B13', styleFrom:'B12'} ],
-        '星期二': [ {cell:'D6', styleFrom:'D5'}, {cell:'D8', styleFrom:'D7'}, {cell:'D11', styleFrom:'D10'}, {cell:'D13', styleFrom:'D12'} ],
-        '星期三': [ {cell:'F6', styleFrom:'F5'}, {cell:'F8', styleFrom:'F7'}, {cell:'F11', styleFrom:'F10'}, {cell:'F13', styleFrom:'F12'} ],
-        '星期四': [ {cell:'B17', styleFrom:'B16'}, {cell:'B19', styleFrom:'B18'}, {cell:'B22', styleFrom:'B21'}, {cell:'B24', styleFrom:'B23'} ],
-        '星期五': [ {cell:'D17', styleFrom:'D16'}, {cell:'D19', styleFrom:'D18'}, {cell:'D22', styleFrom:'D21'}, {cell:'D24', styleFrom:'D23'} ]
-    };
-
-    // 写入 schedule，保证实习生优先，格式为“姓名（电话）、姓名（电话）”
-    const days = Object.keys(cellMapping);
-    days.forEach(day => {
-        const cells = cellMapping[day];
-        schedule[day].forEach((tsObj, i) => {
-            if (!cells[i]) return;
-            const parts = [];
-
-            // 实习生先
-            if (tsObj?.intern) {
-                const phone = tsObj.phone?.intern || '';
-                parts.push(`${tsObj.intern}（${phone}）`);
-            }
-            // 高级再
-            if (tsObj?.senior) {
-                const phone = tsObj.phone?.senior || '';
-                parts.push(`${tsObj.senior}（${phone}）`);
-            }
-
-            const value = parts.join(', '); // 多人用逗号分隔
-            setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
-        });
-    });
-
-    // 自动计算周数
-    const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(),0,1))/86400000 + new Date(startDate.getFullYear(),0,1).getDay()+1)/7);
-    const filename = `新闻嗅觉图片社${startDate.getMonth()+1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
-
-    XLSX.writeFile(workbook, filename);
-    console.log("导出 Excel 文件:", filename);
-}
-*/
-
-
-// ==================== GitHub 配置 ====================
-const GITHUB_CONFIG = {
-    owner: 'grasscake492',
-    repo: 'duty-program',
-    labels: ['scheduling', 'submission']
+    } catch (e) { alert("加载失败"); }
 };
 
-// ==================== 登录逻辑区域 ====================
-
-// 游客直接进入游客页面
-function loginAsGuest() {
-    window.location.href = "/guest.html";
-}
-
-// 点击“管理员登录”按钮时显示输入框
-function toggleAdminLogin() {
-    const adminBox = document.getElementById("admin-login");
-    adminBox.style.display = adminBox.style.display === "none" || adminBox.style.display === "" ? "block" : "none";
-}
-
-// 管理员登录验证
-async function loginAsAdmin() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-
+// 生成排班 (Tab 3)
+window.generateSchedule = async function() {
+    if (!sysConfig || !sysConfig.isSet) return alert("无排班计划");
     try {
-        const res = await fetch("/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
+        const res = await fetch('/api/admin/generate', { method: 'POST' });
+        const result = await res.json();
+        if (result.success) {
+            // 1. 先渲染预览表格
+            renderResultTable(result.data);
 
-        const data = await res.json();
+            // 2. 再显示下载按钮
+            const dlArea = document.getElementById('export-download-area');
+            dlArea.innerHTML = `<a href="${result.downloadUrl}" target="_blank" class="download-btn">下载Excel 排班表</a>`;
 
-        if (res.ok && data.success) {
-            alert("管理员登录成功！");
-            window.location.href = "/admin.html";
+            alert("排班生成成功！请在下方预览或下载。");
         } else {
-            alert(data.error || "账号或密码错误！");
+            alert("生成失败: " + result.error);
         }
-    } catch (err) {
-        console.error("登录错误：", err);
-        alert("服务器连接失败，请稍后再试。");
+    } catch (e) { alert("错误"); }
+};
+
+// 渲染生成结果预览表
+function renderResultTable(matrix) {
+    const table = document.getElementById('schedule-table');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+
+    // 表头
+    thead.innerHTML = `<tr>${matrix[0].map(h => `<th>${h}</th>`).join('')}</tr>`;
+
+    // 表体
+    tbody.innerHTML = '';
+    for (let i = 1; i < matrix.length; i++) {
+        let html = '<tr>';
+        matrix[i].forEach((cell, idx) => {
+            // 第一列是时间，或者内容不为空，给点底色
+            const hasContent = (idx > 0 && cell !== "");
+            const style = hasContent ? 'background:#d1f2eb; color:#16a085; font-weight:bold;' : '';
+            html += `<td style="${style}">${cell || '-'}</td>`;
+        });
+        html += '</tr>';
+        tbody.innerHTML += html;
     }
 }
 
-// ==================== 工具函数 ====================
-// 切换 tab 内容
-function switchTab(tabId) {
-    const tabs = document.querySelectorAll('.tab');
-    const tabContents = document.querySelectorAll('.tab-content');
+// 日期计算预览 (Tab 3 创建时用)
+window.previewDates = function() {
+    const startVal = document.getElementById('start-date').value;
+    const endVal = document.getElementById('end-date').value;
+    const container = document.getElementById('date-selection-area');
+    const checkboxesDiv = document.getElementById('dates-checkboxes');
 
-    // 移除所有 tab 的 active 类
-    tabs.forEach(tab => tab.classList.remove('active'));
-    tabContents.forEach(content => content.classList.remove('active'));
+    if (!startVal || !endVal) return;
+    const start = new Date(startVal);
+    const end = new Date(endVal);
 
-    // 给点击的 tab 添加 active 类
-    document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    if (start > end) return alert("结束日期不能早于开始日期");
 
-    // 显示对应的 tab 内容
-    document.getElementById(tabId).classList.add('active');
-}
+    container.style.display = 'block';
+    checkboxesDiv.innerHTML = '';
 
-// 获取本周一的日期
-function getThisWeekStart() {
-    const now = new Date();
-    const day = now.getDay(); // 0=周日, 1=周一...
-    const diffToMonday = (day === 0 ? -6 : 1 - day); // 计算本周一与今天的差值
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-}
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const dayName = weekDaysMap[d.getDay()];
+        const isChecked = d.getDay() !== 0 ? 'checked' : '';
 
-// 下周范围（周一到周五）
-function getNextWeekRange() {
-    const now = new Date();
-    const day = now.getDay(); // 0=周日,1=周一
-    const diffToMonday = (day === 0 ? 1 : 8 - day);
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    friday.setHours(23, 59, 59, 999);
-
-    return { monday, friday };
-}
-
-// UI 通知
-function showNotification(message, isError = false) {
-    const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.className = 'notification' + (isError ? ' error' : '');
-    notification.classList.add('show');
-    setTimeout(() => notification.classList.remove('show'), 3000);
-}
-
-// ==================== 构建提交数据 & role 绑定 ====================
-
-// 构建提交数据
-let selectedRole = null;
-
-// 绑定 role radio 按钮事件
-function bindRoleRadios() {
-    const radios = document.querySelectorAll('input[name="role"]');
-    radios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            selectedRole = e.target.value;
-        });
-
-        if (radio.checked) {
-            selectedRole = radio.value;
-        }
-    });
-}
-
-// 页面加载完成后绑定
-document.addEventListener('DOMContentLoaded', bindRoleRadios);
-
-// 构建提交的数据
-function buildSubmissionData() {
-    const name = document.getElementById('name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-
-    const availability = [];
-    document.querySelectorAll('.schedule-cell.selected').forEach(cell => {
-        availability.push({
-            day: cell.getAttribute('data-day'),
-            time: cell.getAttribute('data-time')
-        });
-    });
-
-    const submission = {
-        name,
-        phone,
-        role: selectedRole,
-        availability,
-        timestamp: new Date().toISOString()
-    };
-
-    return submission;
-}
-
-// ==================== 提交数据 ====================
-async function submitToBackend() {
-    const submissionData = buildSubmissionData();
-    const errors = validateSubmissionData(submissionData);
-    if (errors.length > 0) {
-        showNotification(errors[0], true);
-        return;
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <label style="cursor:pointer; display:flex; align-items:center; gap:8px; background:#f8f9fa; padding:8px 12px; border-radius:6px; border:1px solid #eee;">
+                <input type="checkbox" name="sched-day" value="${dateStr}" data-day="${dayName}" ${isChecked}>
+                <div style="line-height:1.2">
+                    <div style="font-weight:bold; color:#2c3e50;">${dateStr}</div>
+                    <div style="font-size:12px; color:#7f8c8d;">${dayName}</div>
+                </div>
+            </label>
+        `;
+        checkboxesDiv.appendChild(div);
     }
+};
 
-    const submitButton = document.getElementById('submit-btn');
-    submitButton.disabled = true;
+window.createSchedule = async function() {
+    const weekName = document.getElementById('week-name').value.trim();
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+
+    if (!weekName) return alert("请输入周次名称");
+    const checkboxes = document.querySelectorAll('input[name="sched-day"]:checked');
+    if (checkboxes.length === 0) return alert("请至少勾选一天");
+
+    const selectedDays = Array.from(checkboxes).map(cb => ({
+        date: cb.value,
+        dayOfWeek: cb.getAttribute('data-day')
+    }));
+
+    if (sysConfig && sysConfig.isSet && sysConfig.weekName === weekName) {
+        if(!confirm(`确认覆盖 "${weekName}" 的排班计划吗？`)) return;
+    }
 
     try {
-        const response = await fetch('/api/create-issue', {
+        const res = await fetch('/api/admin/create-schedule', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submissionData)
+            body: JSON.stringify({ weekName, startDate, endDate, selectedDays })
         });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            showNotification('提交成功！数据已保存');
-            clearForm();
-            if (result.issueUrl) window.open(result.issueUrl, '_blank');
-        } else {
-            throw new Error(result.error || '提交失败');
-        }
-    } catch (err) {
-        console.error(err);
-        showNotification('提交失败: ' + err.message, true);
-    } finally {
-        submitButton.disabled = false;
-    }
-}
-//================查看GitHub
-async function viewGitHubIssues() {
-    try {
-        // 拉取 GitHub 的 Issues 数据
-        const issues = await fetchGitHubIssues();
-        const issuesList = document.getElementById("issues-list");
-        issuesList.innerHTML = "";  // 清空现有的列表
-
-        if (issues.length === 0) {
-            issuesList.textContent = "没有找到任何 Issues";
-        } else {
-            issues.forEach(issue => {
-                const issueItem = document.createElement("li");
-                issueItem.textContent = issue.title;
-                issuesList.appendChild(issueItem);
-            });
-        }
-    } catch (error) {
-        console.error("获取 GitHub Issues 时发生错误:", error);
-    }
-}
-
-// ==================== GitHub 数据操作 ====================
-
-async function fetchGitHubIssues() {
-    const response = await fetch('/api/fetch-issues');
-    if (!response.ok) throw new Error('拉取 GitHub Issues 失败');
-
-    const issues = await response.json();
-
-    const parsed = issues.map(issue => {
-        try {
-            const data = JSON.parse(issue.body);
-            if (!data.name || !data.phone || !data.role || !data.availability) return null;
-            data.timestamp = new Date(data.timestamp || issue.created_at);
-            data.html_url = issue.html_url;
-            return data;
-        } catch (err) {
-            console.warn('解析 Issue body 失败', issue.html_url);
-            return null;
-        }
-    }).filter(Boolean);
-
-    return parsed;
-}
-
-// ==================== 过滤函数 ====================
-function filterThisWeekIssues(issues) {
-    const weekStart = getThisWeekStart();
-    return issues.filter(issue => {
-        try {
-            const data = JSON.parse(issue.body);
-            const ts = new Date(data.timestamp);
-            return ts >= weekStart;
-        } catch (err) {
-            return false;
-        }
-    });
-}
-
-// ==================== 排班生成 ====================
-async function generateScheduleFromGitHub() {
-    const tableBody = document.querySelector('#schedule-table tbody');
-    tableBody.innerHTML = '<tr><td colspan="7">正在生成...</td></tr>';
-
-    try {
-        // 获取所有 GitHub Issues
-        const issues = await fetchGitHubIssues();
-
-        // 获取本周上传的 Issues，排除上周及之前的
-        const thisWeekIssues = filterThisWeekIssues(issues);
-
-        const days = ['星期一', '星期二', '星期三', '星期四', '星期五'];
-        const timeSlots = ['一二节', '三四节', '五六节', '七八节'];
-
-        // 初始化排班表
-        const schedule = {};
-        days.forEach(day => schedule[day] = Array(timeSlots.length).fill(null));
-
-        // 构建最新提交字典，用于查手机号
-        const latestByName = {};
-        thisWeekIssues.forEach(issue => {
-            const data = JSON.parse(issue.body);
-            if (!data.name) return;
-            const ts = new Date(data.timestamp || issue.created_at).getTime();
-            if (!latestByName[data.name] || ts > latestByName[data.name].timestamp) {
-                latestByName[data.name] = { ...data, timestamp: ts };
-            }
-        });
-
-        const assignedPeople = new Set();
-
-        // 排班
-        Object.values(latestByName).forEach(p => {
-            if (!p.availability || assignedPeople.has(p.name)) return;
-            let placed = false;
-
-            // 优先空格
-            p.availability.sort(slot => {
-                const day = slot.day;
-                const timeIdx = timeSlots.indexOf(slot.time);
-                return schedule[day]?.[timeIdx] ? 1 : -1;
-            });
-
-            // 遍历可用时间段，寻找可排的时间
-            for (const slot of p.availability) {
-                const dayIndex = days.indexOf(slot.day);
-                const timeIndex = timeSlots.indexOf(slot.time);
-                if (dayIndex < 0 || timeIndex < 0) continue;
-
-                const cell = schedule[slot.day][timeIndex];
-                if (!cell) {
-                    schedule[slot.day][timeIndex] = { intern: null, senior: null };
-                }
-
-                const tsObj = schedule[slot.day][timeIndex];
-                const role = p.role || 'intern';
-
-                // 若没有人排班，填充该时间段
-                if (!tsObj[role]) {
-                    tsObj[role] = p.name;
-                    assignedPeople.add(p.name);
-                    placed = true;
-                    break;
-                }
-            }
-
-            if (!placed) console.warn(`未能排班: ${p.name} (${p.role})`);
-        });
-
-        // 更新排班表
-        tableBody.innerHTML = '';
-        let emptyCount = 0;
-
-        for (let ti = 0; ti < timeSlots.length; ti++) {
-            const row = document.createElement('tr');
-            const timeCell = document.createElement('td');
-            timeCell.textContent = timeSlots[ti];
-            row.appendChild(timeCell);
-
-            days.forEach(d => {
-                const cell = document.createElement('td');
-                const tsObj = schedule[d][ti];
-                const valArr = [];
-
-                // 如果有实习生，优先排
-                if (tsObj?.intern) {
-                    const phone = latestByName[tsObj.intern]?.phone || '';
-                    valArr.push(`${tsObj.intern}（${phone}）`);
-                }
-                if (tsObj?.senior) {
-                    const phone = latestByName[tsObj.senior]?.phone || '';
-                    valArr.push(`${tsObj.senior}（${phone}）`);
-                }
-
-                if (!valArr.length) emptyCount++;
-                cell.textContent = valArr.join(', ');
-                row.appendChild(cell);
-            });
-
-            tableBody.appendChild(row);
-        }
-
-        showNotification(`排班表生成成功，无人值班节数: ${emptyCount}`);
-    } catch (err) {
-        console.error(err);
-        showNotification('生成排班表失败: ' + err.message, true);
-    }
-}
-
-// ==================== 排班Excel导出 ====================
-async function exportScheduleWithTemplate(schedule, startDate, endDate) {
-    const workbook = await loadTemplate();
-    const ws = workbook.Sheets[workbook.SheetNames[0]];
-
-    // 更新 B3 日期
-    const startStr = `${startDate.getFullYear()}年${startDate.getMonth() + 1}月${startDate.getDate()}日`;
-    const endStr = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
-    setCellValue(ws, 'B3', `${startStr}-${endStr}`, 'B3');
-
-    const cellMapping = {
-        '星期一': [{ cell: 'B6', styleFrom: 'B5' }, { cell: 'B8', styleFrom: 'B7' }, { cell: 'B11', styleFrom: 'B10' }, { cell: 'B13', styleFrom: 'B12' }],
-        '星期二': [{ cell: 'D6', styleFrom: 'D5' }, { cell: 'D8', styleFrom: 'D7' }, { cell: 'D11', styleFrom: 'D10' }, { cell: 'D13', styleFrom: 'D12' }],
-        '星期三': [{ cell: 'F6', styleFrom: 'F5' }, { cell: 'F8', styleFrom: 'F7' }, { cell: 'F11', styleFrom: 'F10' }, { cell: 'F13', styleFrom: 'F12' }],
-        '星期四': [{ cell: 'B17', styleFrom: 'B16' }, { cell: 'B19', styleFrom: 'B18' }, { cell: 'B22', styleFrom: 'B21' }, { cell: 'B24', styleFrom: 'B23' }],
-        '星期五': [{ cell: 'D17', styleFrom: 'D16' }, { cell: 'D19', styleFrom: 'D18' }, { cell: 'D22', styleFrom: 'D21' }, { cell: 'D24', styleFrom: 'D23' }]
-    };
-
-    // 写入 schedule，保证实习生优先，格式为“姓名（电话）、姓名（电话）”
-    const days = Object.keys(cellMapping);
-    days.forEach(day => {
-        const cells = cellMapping[day];
-        schedule[day].forEach((tsObj, i) => {
-            if (!cells[i]) return;
-            const parts = [];
-
-            if (tsObj?.intern) {
-                const phone = tsObj.phone?.intern || '';
-                parts.push(`${tsObj.intern}（${phone}）`);
-            }
-            if (tsObj?.senior) {
-                const phone = tsObj.phone?.senior || '';
-                parts.push(`${tsObj.senior}（${phone}）`);
-            }
-
-            const value = parts.join(', ');
-            setCellValue(ws, cells[i].cell, value, cells[i].styleFrom);
-        });
-    });
-
-    // 自动计算周数
-    const weekNum = Math.ceil(((startDate - new Date(startDate.getFullYear(), 0, 1)) / 86400000 + new Date(startDate.getFullYear(), 0, 1).getDay() + 1) / 7);
-    const filename = `新闻嗅觉图片社${startDate.getMonth() + 1}月${startDate.getDate()}日 第${weekNum}周值班表.xlsx`;
-
-    XLSX.writeFile(workbook, filename);
-    console.log("导出 Excel 文件:", filename);
-}
+        const result = await res.json();
+        if (result.success) {
+            alert("计划创建成功！");
+            window.location.reload();
+        } else alert(result.error);
+    } catch (e) { alert("网络错误"); }
+};

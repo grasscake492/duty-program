@@ -3,444 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员-图片社排班系统</title>
+    <title>管理员后台-图片社排班系统</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #ccc3e2 100%);
-            color: #333;
-            line-height: 1.6;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        .description {
-            color: #7f8c8d;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        input[type="text"],
-        input[type="tel"] {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        input[type="text"]:focus,
-        input[type="tel"]:focus {
-            border-color: #3498db;
-            outline: none;
-        }
-        button {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: background 0.3s, transform 0.2s;
-        }
-        button:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-        button:active {
-            transform: translateY(0);
-        }
-        .schedule-grid {
-            display: grid;
-            grid-template-columns: 100px repeat(5, 1fr);
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .time-slot {
-            background: #34495e;
-            color: white;
-            padding: 15px 10px;
-            text-align: center;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        .day-header {
-            background: #2c3e50;
-            color: white;
-            padding: 15px 10px;
-            text-align: center;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        .schedule-cell {
-            background: #ecf0f1;
-            height: 70px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-            border: 2px solid transparent;
-            user-select: none;
-        }
-        .role-options {
-            display: flex;
-            gap: 20px;
-            margin-top: 10px;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #ccc3e2 100%); color: #333; line-height: 1.6; padding: 20px; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; }
 
-        .role-option {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            font-weight: 600;
-            background: #f8f9fa;
-        }
+        header { text-align: center; margin-bottom: 30px; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        .description { color: #7f8c8d; font-size: 1.1em; }
 
-        .role-option:hover {
-            border-color: #3498db;
-        }
+        .card { background: white; border-radius: 12px; padding: 30px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
 
-        .role-option input[type="radio"] {
-            transform: scale(1.2);
-        }
+        .tabs { display: flex; margin-bottom: 25px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 10px; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; color: #555; transition: all 0.3s; margin: 0 5px; }
+        .tab:hover { background: rgba(255,255,255,0.8); color: #3498db; }
+        .tab.active { background: #3498db; color: white; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
 
-        .role-option input[type="radio"]:checked + span {
-            color: #3498db;
-            font-weight: 700;
-        }
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .schedule-cell.selected {
-            background: #2ecc71;
-            color: white;
-            font-weight: 600;
-            border-color: #27ae60;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
-            transform: scale(1.02);
-        }
-        /* 移除悬停效果，只保留点击效果 */
-        .schedule-cell:hover {
-            background: #ecf0f1; /* 保持原背景色，不变化 */
-        }
-        .schedule-cell.selected:hover {
-            background: #2ecc71; /* 选中状态下悬停也不变化 */
-        }
-        /* 点击动画效果 */
-        @keyframes cellClick {
-            0% { transform: scale(1); }
-            50% { transform: scale(0.95); }
-            100% { transform: scale(1); }
-        }
-        .schedule-cell.click-feedback {
-            animation: cellClick 0.3s ease;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 15px;
-            text-align: center;
-        }
-        th {
-            background-color: #2c3e50;
-            color: white;
-            font-weight: 600;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-        }
-        .tab {
-            padding: 12px 25px;
-            cursor: pointer;
-            background: #f8f9fa;
-            border-radius: 6px 6px 0 0;
-            margin-right: 5px;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-        .tab.active {
-            background: #3498db;
-            color: white;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .admin-panel {
-            background: #fff8e1;
-            border-left: 4px solid #ffc107;
-        }
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            background: #2ecc71;
-            color: white;
-            border-radius: 6px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            transform: translateX(100%);
-            transition: transform 0.3s;
-            z-index: 1000;
-        }
-        .notification.show {
-            transform: translateX(0);
-        }
-        .notification.error {
-            background: #e74c3c;
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f7;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-        }
-        .status-message {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 5px;
-            background: #f8f9fa;
-            border-left: 4px solid #3498db;
-        }
-        .status-message.success {
-            border-left-color: #2ecc71;
-            background: #e8f5e8;
-        }
-        .status-message.error {
-            border-left-color: #e74c3c;
-            background: #fee;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        input[type="text"], input[type="tel"], input[type="date"] { padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; outline: none; }
+        input:focus { border-color: #3498db; }
 
-        @media (max-width: 768px) {
-            .schedule-grid {
-                grid-template-columns: 80px repeat(5, 1fr);
-                gap: 5px;
-            }
-            .time-slot, .day-header, .schedule-cell {
-                padding: 10px 5px;
-                font-size: 14px;
-            }
-        }
+        button { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.2s; }
+        button:hover { background: #2980b9; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3); }
+
+        .user-tag { display: inline-block; padding: 8px 16px; background: #f0f2f5; color: #2c3e50; border-radius: 20px; cursor: pointer; font-weight: 600; margin: 5px; transition: all 0.2s; border: 2px solid transparent; }
+        .user-tag:hover { background: #e1e4e8; transform: scale(1.05); }
+        .user-tag.active-tag { background: #3498db; color: white; border-color: #2980b9; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
+
+        /* 预览表格样式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+        th { background-color: #2c3e50; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        .download-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 15px; transition: all 0.2s; }
+        .download-btn:hover { background: #27ae60; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); transform: translateY(-2px); }
     </style>
 </head>
-
 <body>
 <div class="container">
     <header>
-        <h1>图片社自动排班系统</h1>
-        <p class="description">填写信息并选择可用时间段</p>
+        <h1>图片社自动排班系统 · 管理后台</h1>
+        <p id="week-display-title" class="description">正在加载系统配置...</p>
     </header>
 
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('user')">填写可用时间</div>
-        <div class="tab" onclick="switchTab('admin')">排班功能</div>
+        <div class="tab active" onclick="switchTab('user')">1. 代填排班</div>
+        <div class="tab" onclick="switchTab('view')">2. 查看详情</div>
+        <div class="tab" onclick="switchTab('admin')">3. 计划与生成</div>
     </div>
 
+    <!-- TAB 1: 管理员替人填表 -->
     <div id="user" class="tab-content active">
         <div class="card">
-            <h2>个人信息</h2>
-
-            <div class="form-group">
-                <label for="name">姓名</label>
-                <input type="text" id="name" placeholder="请输入您的姓名" required>
+            <h2 style="margin-bottom:20px; color:#2c3e50;">填写可用时间</h2>
+            <div style="margin-bottom:25px; display:flex; gap:15px; flex-wrap:wrap;">
+                <input type="text" id="name" placeholder="姓名" style="flex:1;">
+                <input type="text" id="phone" placeholder="手机号" style="flex:1;">
+                <div style="display:flex; align-items:center; gap:15px; background:#f9f9f9; padding:0 15px; border-radius:8px; border:2px solid #e0e0e0;">
+                    <label style="cursor:pointer;"><input type="radio" name="role" value="intern"> 实习</label>
+                    <label style="cursor:pointer;"><input type="radio" name="role" value="senior"> 高级</label>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="phone">手机号码</label>
-                <input type="tel" id="phone" placeholder="请输入手机号码" required>
+            <!-- 动态生成的填表网格 -->
+            <div id="admin-fill-grid"></div>
+
+            <div style="margin-top:25px; text-align:right;">
+                <button id="submit-btn">提交排班数据</button>
             </div>
-
-            <div class="role-options">
-                <label class="role-option">
-                    <input type="radio" name="role" value="intern"> 实习
-                </label>
-                <label class="role-option">
-                    <input type="radio" name="role" value="senior"> 中高级
-                </label>
-            </div>
-
-        </div>
-
-
-        <div class="card">
-            <h2>选择可用时间</h2>
-            <p>请勾选有空的时间段</p>
-
-            <div class="schedule-grid">
-                <div class="time-slot">时间/日期</div>
-                <div class="day-header">星期一</div>
-                <div class="day-header">星期二</div>
-                <div class="day-header">星期三</div>
-                <div class="day-header">星期四</div>
-                <div class="day-header">星期五</div>
-
-                <div class="time-slot">一二节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期一">第一二节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期二">第一二节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期三">第一二节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期四">第一二节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="一二节" data-day="星期五">第一二节</div>
-
-                <div class="time-slot">三四节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期一">第三四节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期二">第三四节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期三">第三四节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期四">第三四节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="三四节" data-day="星期五">第三四节</div>
-
-                <div class="time-slot">五六节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期一">第五六节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期二">第五六节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期三">第五六节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期四">第五六节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="五六节" data-day="星期五">第五六节</div>
-
-                <div class="time-slot">七八节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期一">第七八节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期二">第七八节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期三">第七八节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期四">第七八节</div>
-                <div class="schedule-cell" onclick="toggleCell(this)" data-time="七八节" data-day="星期五">第七八节</div>
-            </div>
-
-            <button id="submit-btn">提交排班</button>
-            <div id="submit-status" class="status-message">
-                请填写信息并选择可用时间后提交
-            </div>
-
         </div>
     </div>
 
-    <div id="admin" class="tab-content">
-        <div class="card admin-panel">
-            <h2>数据管理</h2>
-            <p>管理排班数据</p>
-
-            <div style="margin: 20px 0;">
-                <button onclick="viewGitHubIssues()">查看上传至 GitHub 的数据</button>
+    <!-- TAB 2: 查看数据 -->
+    <div id="view" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>已提交名单</h2>
+                <button onclick="loadSubmittedData()" style="background:#95a5a6;">↻ 刷新列表</button>
             </div>
 
-            <div style="margin-top: 30px;">
-                <!--<h3>生成排班表</h3>
-                <button onclick="generateScheduleFromGitHub()">根据提交数据生成排班</button>
-                -->
-                <button onclick="generateScheduleFromGitHub()">生成排班表</button>
+            <div id="submitted-list-view" style="display:flex; flex-wrap:wrap;"></div>
 
-                <div id="schedule-result">
-                    <h4 style="margin-top: 20px;">排班结果</h4>
-                    <table id="schedule-table">
-                        <thead>
-                        <tr>
-                            <th>时间/日期</th>
-                            <th>星期一</th>
-                            <th>星期二</th>
-                            <th>星期三</th>
-                            <th>星期四</th>
-                            <th>星期五</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td colspan="6">暂无排班数据</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <!-- 详情区域 -->
+            <div id="user-detail-view" style="display:none; margin-top:30px; border-top:2px dashed #eee; padding-top:20px; animation:fadeIn 0.3s;">
+                <h3 style="margin-bottom:15px;">
+                    <span id="detail-name" style="color:#e74c3c;"></span> 的时间详情：
+                </h3>
+
+                <!-- 动态生成的只读网格容器 -->
+                <div id="readonly-view-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: 创建计划 & 生成 -->
+    <div id="admin" class="tab-content">
+        <!-- 上半部分：创建计划 -->
+        <div class="card" style="border-left: 5px solid #f39c12;">
+            <h2 style="color:#e67e22; margin-bottom:15px;">创建新排班计划</h2>
+            <p style="color:#7f8c8d; margin-bottom:20px;">设置本周需要排班的名称和具体日期范围。</p>
+
+            <div style="display:flex; gap:15px; margin-bottom:15px; align-items:center;">
+                <input type="text" id="week-name" placeholder="周次名 (如: 第5周)" style="width:200px;">
+                <input type="date" id="start-date" onchange="previewDates()">
+                <span style="font-weight:bold;">至</span>
+                <input type="date" id="end-date" onchange="previewDates()">
+            </div>
+
+            <div id="date-selection-area" style="display:none; background:#fdfdfd; padding:20px; border-radius:8px; border:1px solid #eee; margin-bottom:20px;">
+                <h4 style="margin-bottom:15px;">请勾选需要排班的日期：</h4>
+                <div id="dates-checkboxes" style="display:flex; flex-wrap:wrap; gap:15px;"></div>
+            </div>
+
+            <button onclick="createSchedule()" style="background:#f39c12;">保存排班计划</button>
+        </div>
+
+        <!-- 下半部分：生成 Excel -->
+        <div class="card">
+            <h2 style="margin-bottom:15px;">生成排班表</h2>
+
+            <button onclick="generateSchedule()">生成预览并导出</button>
+
+            <div id="schedule-result" style="margin-top:20px;">
+                <!-- 先显示表格，后显示下载按钮 -->
+                <table id="schedule-table">
+                    <thead><tr><th>暂无预览数据</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+
+                <div id="export-download-area" style="text-align:center; margin-top:20px;"></div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="notification" id="notification">提交成功！</div>
 <script>
-    // ==================== 工具函数部分 ====================
-
-    // 切换单元格选择状态
-    function toggleCell(cell) {
-        cell.classList.toggle('selected');
-        provideClickFeedback(cell);
-    }
-
-    // 提供点击视觉反馈
-    function provideClickFeedback(cell) {
-        cell.classList.add('click-feedback');
-        setTimeout(() => {
-            cell.classList.remove('click-feedback');
-        }, 300);
+    function switchTab(id) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelector(`.tab[onclick="switchTab('${id}')"]`).classList.add('active');
+        document.getElementById(id).classList.add('active');
     }
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="/js/main.js"></script>
 </body>
 </html>
-
