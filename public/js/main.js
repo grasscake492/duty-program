@@ -134,21 +134,18 @@ function renderGrid(containerId, options = {}) {
     }
 }
 
-// ================== 3. 提交逻辑 ==================
+// ================== 3. 提交逻辑 (关键修改) ==================
 function bindSubmitEvent(gridContainerId) {
     let submitBtn;
-    // 区分 Guest 页面和 Admin 页面
     if (gridContainerId === 'admin-fill-grid') {
         submitBtn = document.querySelector('#user #submit-btn');
     } else {
         submitBtn = document.getElementById('submit-btn');
     }
-
     if (!submitBtn) return;
 
     submitBtn.addEventListener('click', async () => {
         let name, phone, roleRadio;
-
         if (gridContainerId === 'admin-fill-grid') {
             name = document.querySelector('#user #name').value.trim();
             phone = document.querySelector('#user #phone').value.trim();
@@ -163,7 +160,6 @@ function bindSubmitEvent(gridContainerId) {
 
         const container = document.getElementById(gridContainerId);
         const selectedCells = container.querySelectorAll('.schedule-cell.selected');
-
         if (selectedCells.length === 0) return alert("请至少勾选一个时间段！");
 
         const availability = Array.from(selectedCells).map(cell => ({
@@ -174,28 +170,26 @@ function bindSubmitEvent(gridContainerId) {
 
         const payload = {
             name, phone, role: roleRadio.value,
-            week: sysConfig.weekName,
+            // 提交到带年份的 folderName 文件夹
+            week: sysConfig.folderName,
             availability
         };
 
         try {
             submitBtn.disabled = true;
             submitBtn.innerText = "提交中...";
-
             const res = await fetch('/api/submit', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
             const result = await res.json();
-
             if (result.success) {
                 alert("提交成功！");
                 if (gridContainerId !== 'admin-fill-grid') {
                     window.location.reload();
                 } else {
-                    // Admin 填表后只清空数据，不刷新
-                    selectedCells.forEach(c => c.click()); // 反选
+                    selectedCells.forEach(c => c.click());
                     document.querySelector('#user #name').value = '';
                     document.querySelector('#user #phone').value = '';
                     submitBtn.disabled = false;
