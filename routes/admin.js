@@ -82,42 +82,36 @@ router.post('/generate', async (req, res) => {
         const config = configService.getConfig();
         if (!config.isSet) return res.status(400).json({ success: false, error: '请先创建排班计划' });
 
-        // 读取带年份的文件夹数据
         const users = fileService.getWeekData(config.folderName);
         if (users.length === 0) return res.status(400).json({ success: false, error: '当前暂无人员提交数据' });
 
+        // 1. 获取最新的排班矩阵
         const scheduleArray = scheduleService.generateSchedule(users, config.selectedDays);
 
         const dateRangeStr = `${config.startDate} 至 ${config.endDate}`;
 
-        // 导出时，folderName用于找模板位置（目前不需要），weekName用于Excel内部标题
-        // 这里的 fileName 可以选择带年份也可以不带，为了清晰，建议带上年份
-        // 传入 config.folderName 作为 weekNum 参数，这样文件名就是 "新闻嗅觉图片社2026-第5周值班表.xlsx"
+        // 生成一个唯一的时间戳标识 (例如 202310271030)
+        const timestamp = new Date().getTime();
+
+        // 2. 传入文件夹名、周次名、日期范围，以及这个唯一的时间戳
+        // 我们修改 excelService 接收这个时间戳来重命名文件
         const fileName = await excelService.exportToExcel(
             scheduleArray,
-            config.folderName, // 以前传的是 weekName，现在传 folderName (2026-第5周)
-            config.weekName,   // 传给 Excel 内部标题用 (显示 "第5周")
-            dateRangeStr
+            config.folderName,
+            config.weekName,
+            dateRangeStr,
+            timestamp // 传入时间戳
         );
 
         res.json({
             success: true,
-            data: scheduleArray,
+            data: scheduleArray, // 这个数据用于前端预览渲染
             downloadUrl: `/api/admin/download/${encodeURIComponent(fileName)}`
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: '排班生成失败' });
     }
-});
-
-// 下载接口
-router.get('/download/:filename', (req, res) => {
-    const filename = req.params.filename;
-    const filePath = path.join(__dirname, '../output', filename);
-    res.download(filePath, filename, (err) => {
-        if (err) console.error('[下载失败]', err);
-    });
 });
 
 module.exports = router;
