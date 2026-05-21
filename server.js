@@ -15,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 系统启动时自动检查并建立必备的系统文件夹结构
 const requiredDirs =[
     path.join(__dirname, 'data', 'weeks'),
+    path.join(__dirname, 'data', 'loans'),
     path.join(__dirname, 'output')
 ];
 
@@ -48,10 +49,12 @@ app.post('/api/server', (req, res) => {
 // 引入分层路由
 const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
+const loanRoutes = require('./routes/loan');
 
 // 挂载路由
 app.use('/api', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/loan', loanRoutes);
 
 // 全局错误处理
 app.use((err, req, res, next) => {

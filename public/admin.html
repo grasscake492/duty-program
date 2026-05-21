@@ -3,46 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员后台-图片社排班系统</title>
+    <title>管理员后台 - 图片社系统</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #f5f7fa 0%, #ccc3e2 100%); color: #333; line-height: 1.6; padding: 20px; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; }
-
+        .container { max-width: 1280px; margin: 0 auto; }
         header { text-align: center; margin-bottom: 30px; padding: 25px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
         h1 { color: #2c3e50; margin-bottom: 5px; }
+        h2 { color: #2c3e50; margin-bottom: 18px; }
         .description { color: #7f8c8d; font-size: 1.1em; }
-
         .card { background: white; border-radius: 12px; padding: 30px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); transition: transform 0.2s; }
         .card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
-
-        .tabs { display: flex; margin-bottom: 25px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 10px; }
-        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; color: #555; transition: all 0.3s; margin: 0 5px; }
+        .tabs { display: flex; margin-bottom: 25px; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 10px; gap: 5px; }
+        .tab { flex: 1; padding: 15px 10px; text-align: center; cursor: pointer; border-radius: 8px; font-weight: 600; color: #555; transition: all 0.3s; }
         .tab:hover { background: rgba(255,255,255,0.8); color: #3498db; }
         .tab.active { background: #3498db; color: white; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
-
         .tab-content { display: none; animation: fadeIn 0.4s ease; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        input[type="text"], input[type="tel"], input[type="date"] { padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; outline: none; }
-        input:focus { border-color: #3498db; }
-
+        input, select { padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; outline: none; background: white; }
+        input:focus, select:focus { border-color: #3498db; }
         button { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.2s; }
         button:hover { background: #2980b9; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3); }
-
+        .success-btn { background: #2ecc71; }
+        .success-btn:hover { background: #27ae60; box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3); }
+        .warning-btn { background: #f39c12; }
+        .warning-btn:hover { background: #d68910; box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3); }
+        .danger-btn { background: #e74c3c; }
+        .danger-btn:hover { background: #c0392b; box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3); }
         .user-tag { display: inline-block; padding: 8px 16px; background: #f0f2f5; color: #2c3e50; border-radius: 20px; cursor: pointer; font-weight: 600; margin: 5px; transition: all 0.2s; border: 2px solid transparent; }
         .user-tag:hover { background: #e1e4e8; transform: scale(1.05); }
         .user-tag.active-tag { background: #3498db; color: white; border-color: #2980b9; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
-
-        /* 预览表格样式 */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: center; vertical-align: middle; }
         th { background-color: #2c3e50; color: white; }
         tr:nth-child(even) { background-color: #f9f9f9; }
-
+        tr.overdue { background: #fdecea; }
+        tr.pickup-soon { animation: pulseRow 1.1s infinite; }
+        @keyframes pulseRow { 0%, 100% { box-shadow: inset 4px 0 0 #f39c12; } 50% { box-shadow: inset 10px 0 0 #f39c12; } }
         .download-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 15px; transition: all 0.2s; }
         .download-btn:hover { background: #27ae60; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); transform: translateY(-2px); }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .badge { display: inline-block; min-width: 76px; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+        .badge.pending { background: #fff3cd; color: #9a6500; }
+        .badge.processed { background: #d6eaf8; color: #2980b9; }
+        .badge.returned { background: #d5f5e3; color: #27ae60; }
+        .badge.overdue { background: #fadbd8; color: #c0392b; }
+        .badge.maintenance { background: #fdebd0; color: #d35400; }
+        .badge.in-use { background: #d6eaf8; color: #2980b9; }
+        .badge.repair { background: #fdebd0; color: #d35400; }
+        .inventory-form { display: grid; grid-template-columns: 1fr 1.3fr 110px 110px 120px 110px; gap: 12px; align-items: end; }
+        .inventory-form label { display: block; margin-bottom: 7px; font-weight: 600; color: #2c3e50; }
+        .inventory-form input, .inventory-form select, .inventory-form button { width: 100%; height: 52px; }
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .filter-row select { min-width: 130px; }
+        .inventory-tools { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 12px; align-items: center; margin-bottom: 16px; }
+        .category-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+        .category-chip { background: #f0f2f5; color: #2c3e50; border: 1px solid #e1e4e8; padding: 9px 13px; border-radius: 8px; font-size: 14px; }
+        .category-chip:hover { background: #e8f4fd; color: #2980b9; transform: translateY(-1px); box-shadow: none; }
+        .inventory-category { border: 1px solid #edf0f2; border-radius: 8px; margin-bottom: 14px; overflow: hidden; background: #fbfcfd; }
+        .inventory-category summary { cursor: pointer; list-style: none; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; background: #f6f8fa; color: #2c3e50; font-weight: 700; }
+        .inventory-category summary::-webkit-details-marker { display: none; }
+        .category-count { color: #7f8c8d; font-size: 13px; font-weight: 600; }
+        .inventory-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 14px; }
+        .inventory-card-item { border: 1px solid #e8ecef; border-radius: 8px; padding: 13px; background: white; min-height: 145px; display: flex; flex-direction: column; gap: 8px; }
+        .inventory-card-head { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+        .inventory-card-title { color: #2c3e50; font-size: 16px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+        .stock-number { font-size: 32px; line-height: 1; font-weight: 800; color: #27ae60; }
+        .stock-number.low { color: #e74c3c; }
+        .mini-actions { display: flex; gap: 8px; margin-top: auto; }
+        .mini-actions button { flex: 1; padding: 8px 10px; font-size: 13px; }
+        .select-check { width: auto; margin-top: 4px; transform: scale(1.15); }
+        .status-message { margin-top: 14px; padding: 12px 14px; border-radius: 8px; border-left: 4px solid #bdc3c7; display: none; }
+        .status-message.error { border-left-color: #e74c3c; background: #fadbd8; display: block; color: #c0392b; }
+        .status-message.success { border-left-color: #2ecc71; background: #d5f5e3; display: block; color: #27ae60; }
+        .detail-pop { position: fixed; display: none; max-width: 360px; background: #2c3e50; color: white; padding: 14px; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.22); z-index: 10; font-size: 14px; text-align: left; }
+        .detail-pop strong { color: #fff; }
+        @media (max-width: 980px) {
+            .tabs, .toolbar { flex-direction: column; }
+            .tab, .toolbar button { width: 100%; }
+            .inventory-form { grid-template-columns: 1fr 1fr; }
+            .inventory-tools { grid-template-columns: 1fr; }
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
     </style>
 </head>
 <body>
@@ -55,13 +99,14 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('user')">1. 代填排班</div>
         <div class="tab" onclick="switchTab('view')">2. 查看提交</div>
-        <div class="tab" onclick="switchTab('admin')">3. 计划与生成</div>
+        <div class="tab" onclick="switchTab('admin')">3. 计划生成</div>
+        <div class="tab" onclick="switchTab('loan-requests')">4. 借用审核</div>
+        <div class="tab" onclick="switchTab('loan-inventory')">5. 库存管理</div>
     </div>
 
-    <!-- TAB 1: 管理员替人填表 -->
     <div id="user" class="tab-content active">
         <div class="card">
-            <h2 style="margin-bottom:20px; color:#2c3e50;">填写可用时间</h2>
+            <h2>填写可用时间</h2>
             <div style="margin-bottom:25px; display:flex; gap:15px; flex-wrap:wrap;">
                 <input type="text" id="name" placeholder="姓名" style="flex:1;">
                 <input type="text" id="phone" placeholder="手机号" style="flex:1;">
@@ -70,78 +115,148 @@
                     <label style="cursor:pointer;"><input type="radio" name="role" value="senior"> 高级</label>
                 </div>
             </div>
-
-            <!-- 动态生成的填表网格 -->
             <div id="admin-fill-grid"></div>
-
             <div style="margin-top:25px; text-align:right;">
                 <button id="submit-btn">提交排班数据</button>
             </div>
         </div>
     </div>
 
-    <!-- TAB 2: 查看数据 -->
     <div id="view" class="tab-content">
         <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div class="toolbar">
                 <h2>已提交名单</h2>
-                <button onclick="loadSubmittedData()" style="background:#95a5a6;">↻ 刷新列表</button>
+                <button onclick="loadSubmittedData()" style="background:#95a5a6;">刷新列表</button>
             </div>
-
             <div id="submitted-list-view" style="display:flex; flex-wrap:wrap;"></div>
-
-            <!-- 详情区域 -->
             <div id="user-detail-view" style="display:none; margin-top:30px; border-top:2px dashed #eee; padding-top:20px; animation:fadeIn 0.3s;">
-                <h3 style="margin-bottom:15px;">
-                    <span id="detail-name" style="color:#e74c3c;"></span> 的时间详情：
-                </h3>
-
-                <!-- 动态生成的只读网格容器 -->
+                <h3 style="margin-bottom:15px;"><span id="detail-name" style="color:#e74c3c;"></span> 的时间详情：</h3>
                 <div id="readonly-view-grid"></div>
             </div>
         </div>
     </div>
 
-    <!-- TAB 3: 创建计划 & 生成 -->
     <div id="admin" class="tab-content">
-        <!-- 上半部分：创建计划 -->
-        <div class="card" style="border-left: 5px solid #f39c12;">
-            <h2 style="color:#e67e22; margin-bottom:15px;">创建新排班计划</h2>
+        <div class="card" style="border-left:5px solid #f39c12;">
+            <h2 style="color:#e67e22;">创建新排班计划</h2>
             <p style="color:#7f8c8d; margin-bottom:20px;">设置本周需要排班的名称和具体日期范围。</p>
-
-            <div style="display:flex; gap:15px; margin-bottom:15px; align-items:center;">
-                <input type="text" id="week-name" placeholder="周次名 (如: 第5周)" style="width:200px;">
+            <div style="display:flex; gap:15px; margin-bottom:15px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="week-name" placeholder="周次名（如 第1周）" style="width:220px;">
                 <input type="date" id="start-date" onchange="previewDates()">
                 <span style="font-weight:bold;">至</span>
                 <input type="date" id="end-date" onchange="previewDates()">
             </div>
-
             <div id="date-selection-area" style="display:none; background:#fdfdfd; padding:20px; border-radius:8px; border:1px solid #eee; margin-bottom:20px;">
                 <h4 style="margin-bottom:15px;">请勾选需要排班的日期：</h4>
                 <div id="dates-checkboxes" style="display:flex; flex-wrap:wrap; gap:15px;"></div>
             </div>
-
             <button onclick="createSchedule()" style="background:#f39c12;">保存排班计划</button>
         </div>
 
-        <!-- 下半部分：生成 Excel -->
         <div class="card">
-            <h2 style="margin-bottom:15px;">生成排班表</h2>
-
+            <h2>生成排班表</h2>
             <button onclick="generateSchedule()">生成预览并导出</button>
-
             <div id="schedule-result" style="margin-top:20px;">
-                <!-- 先显示表格，后显示下载按钮 -->
                 <table id="schedule-table">
                     <thead><tr><th>暂无预览数据</th></tr></thead>
                     <tbody></tbody>
                 </table>
-
                 <div id="export-download-area" style="text-align:center; margin-top:20px;"></div>
             </div>
         </div>
     </div>
+
+    <div id="loan-requests" class="tab-content">
+        <div class="card">
+            <div class="toolbar">
+                <h2>待处理与进行中的借用申请</h2>
+                <button onclick="loadLoanData()">刷新列表</button>
+            </div>
+            <table>
+                <thead>
+                <tr>
+                    <th>状态</th>
+                    <th>借用人</th>
+                    <th>联系电话</th>
+                    <th>借用时间</th>
+                    <th>预计归还</th>
+                    <th>前往借取</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="active-loan-body"></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <div class="toolbar">
+                <h2>已完成借用历史</h2>
+                <div class="filter-row">
+                    <select id="history-year" onchange="renderLoans()"></select>
+                    <select id="history-month" onchange="renderLoans()"></select>
+                </div>
+            </div>
+            <table>
+                <thead>
+                <tr>
+                    <th>状态</th>
+                    <th>借用人</th>
+                    <th>联系电话</th>
+                    <th>借用时间</th>
+                    <th>归还时间</th>
+                    <th>物资</th>
+                </tr>
+                </thead>
+                <tbody id="history-loan-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="loan-inventory" class="tab-content">
+        <div class="card">
+            <h2>新增设备</h2>
+            <form id="inventory-form" class="inventory-form">
+                <div>
+                    <label for="item-category">设备分类</label>
+                    <input id="item-category" required placeholder="如：镜头">
+                </div>
+                <div>
+                    <label for="item-name">设备名称</label>
+                    <input id="item-name" required placeholder="如：Sony 24-105">
+                </div>
+                <div>
+                    <label for="item-total">总数量</label>
+                    <input id="item-total" required type="number" min="0" value="1">
+                </div>
+                <div>
+                    <label for="item-available">可用数量</label>
+                    <input id="item-available" required type="number" min="0" value="1">
+                </div>
+                <div>
+                    <label for="item-status">状态</label>
+                    <select id="item-status">
+                        <option value="在库">在库</option>
+                        <option value="需要维修">需要维修</option>
+                    </select>
+                </div>
+                <button type="submit">增加设备</button>
+            </form>
+            <div id="inventory-message" class="status-message"></div>
+        </div>
+
+        <div class="card">
+            <div class="inventory-tools">
+                <input id="inventory-search" placeholder="搜索分类、型号或关键词" oninput="renderInventory()">
+                <button type="button" class="ghost-btn" onclick="toggleBatchMode()">批量修改</button>
+                <button type="button" onclick="applyBatchEdit()">提交批量修改</button>
+            </div>
+            <div id="category-tabs" class="category-tabs"></div>
+            <div id="inventory-grid"></div>
+        </div>
+    </div>
 </div>
+
+<div id="detail-pop" class="detail-pop"></div>
 
 <script>
     function switchTab(id) {
@@ -149,8 +264,434 @@
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelector(`.tab[onclick="switchTab('${id}')"]`).classList.add('active');
         document.getElementById(id).classList.add('active');
+        if (id === 'loan-requests') loadLoanData();
+        if (id === 'loan-inventory') loadInventory();
     }
 </script>
 <script src="/js/main.js"></script>
+<script>
+    let loanInventory = [];
+    let loans = [];
+    let inventoryBatchMode = false;
+    const selectedInventoryIds = new Set();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('inventory-form').addEventListener('submit', createInventory);
+        loadLoanData();
+        loadInventory();
+        setInterval(loadLoanData, 60000);
+    });
+
+    async function loadLoanData() {
+        const res = await fetch('/api/loan/loans');
+        const result = await parseApiResponse(res);
+        loans = result.data || [];
+        populateHistoryFilters();
+        renderLoans();
+    }
+
+    async function loadInventory() {
+        const res = await fetch('/api/loan/inventory');
+        const result = await parseApiResponse(res);
+        loanInventory = result.data || [];
+        renderInventory();
+    }
+
+    function renderLoans() {
+        renderActiveLoans();
+        renderHistoryLoans();
+    }
+
+    function renderActiveLoans() {
+        const body = document.getElementById('active-loan-body');
+        const activeLoans = loans.filter(loan => loan.status !== 'Returned');
+        if (activeLoans.length === 0) {
+            body.innerHTML = '<tr><td colspan="7" style="color:#999;">暂无借用申请</td></tr>';
+            return;
+        }
+        body.innerHTML = activeLoans.map(loan => {
+            const status = loan.effectiveStatus || loan.status;
+            const rowClass = `${status === 'Overdue' ? 'overdue' : ''} ${shouldBlink(loan) ? 'pickup-soon' : ''}`;
+            return `
+                <tr class="${rowClass}" onmousemove="showLoanDetail(event, '${loan.id}')" onmouseleave="hideLoanDetail()">
+                    <td>${statusBadge(status)}</td>
+                    <td>${escapeHtml(loan.borrowerName)}</td>
+                    <td>${escapeHtml(loan.phone)}</td>
+                    <td>${formatDate(loan.startTime)}</td>
+                    <td>${formatDate(loan.endTime)}</td>
+                    <td>${formatDate(loan.pickupTime)}</td>
+                    <td class="actions">${loanActions(loan)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderHistoryLoans() {
+        const body = document.getElementById('history-loan-body');
+        const year = document.getElementById('history-year').value;
+        const month = document.getElementById('history-month').value;
+        const historyLoans = loans.filter(loan => {
+            if (loan.status !== 'Returned') return false;
+            const date = new Date(loan.returnedAt || loan.updatedAt || loan.createdAt);
+            const matchYear = !year || String(date.getFullYear()) === year;
+            const matchMonth = !month || String(date.getMonth() + 1).padStart(2, '0') === month;
+            return matchYear && matchMonth;
+        });
+
+        if (historyLoans.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" style="color:#999;">当前月份暂无已完成记录</td></tr>';
+            return;
+        }
+
+        body.innerHTML = historyLoans.map(loan => `
+            <tr onmousemove="showLoanDetail(event, '${loan.id}')" onmouseleave="hideLoanDetail()">
+                <td>${statusBadge(loan.effectiveStatus || loan.status)}</td>
+                <td>${escapeHtml(loan.borrowerName)}</td>
+                <td>${escapeHtml(loan.phone)}</td>
+                <td>${formatDate(loan.startTime)}</td>
+                <td>${formatDate(loan.returnedAt || loan.updatedAt)}</td>
+                <td>${formatLoanItems(loan.items)}</td>
+            </tr>
+        `).join('');
+    }
+
+    function populateHistoryFilters() {
+        const yearSelect = document.getElementById('history-year');
+        const monthSelect = document.getElementById('history-month');
+        const selectedYear = yearSelect.value;
+        const selectedMonth = monthSelect.value;
+        const historyDates = loans
+            .filter(loan => loan.status === 'Returned')
+            .map(loan => new Date(loan.returnedAt || loan.updatedAt || loan.createdAt));
+        const years = [...new Set(historyDates.map(date => date.getFullYear()))].sort((a, b) => b - a);
+
+        yearSelect.innerHTML = '<option value="">全部年份</option>' + years.map(year =>
+            `<option value="${year}">${year}年</option>`
+        ).join('');
+        monthSelect.innerHTML = '<option value="">全部月份</option>' + Array.from({ length: 12 }, (_, index) => {
+            const value = String(index + 1).padStart(2, '0');
+            return `<option value="${value}">${index + 1}月</option>`;
+        }).join('');
+
+        if (years.map(String).includes(selectedYear)) yearSelect.value = selectedYear;
+        if (selectedMonth) monthSelect.value = selectedMonth;
+    }
+
+    function loanActions(loan) {
+        if (loan.status === 'Pending') {
+            return `<button class="success-btn" onclick="event.stopPropagation(); changeLoanStatus('${loan.id}', 'Processed')">确认借出</button>`;
+        }
+        if (loan.status === 'Processed') {
+            return `<button class="warning-btn" onclick="event.stopPropagation(); changeLoanStatus('${loan.id}', 'Returned')">确认归还</button>`;
+        }
+        return '<span style="color:#999;">已完成</span>';
+    }
+
+    function statusBadge(status) {
+        const map = {
+            Pending: ['pending', '待处理'],
+            Processed: ['processed', '已处理'],
+            Returned: ['returned', '已归还'],
+            Overdue: ['overdue', '逾期未归还']
+        };
+        const item = map[status] || ['pending', status];
+        return `<span class="badge ${item[0]}">${item[1]}</span>`;
+    }
+
+    function shouldBlink(loan) {
+        if (loan.status !== 'Pending') return false;
+        const diff = new Date(loan.pickupTime).getTime() - Date.now();
+        return diff > 0 && diff <= 30 * 60 * 1000;
+    }
+
+    function showLoanDetail(event, id) {
+        const loan = loans.find(item => item.id === id);
+        if (!loan) return;
+        const pop = document.getElementById('detail-pop');
+        pop.innerHTML = `
+            <strong>${escapeHtml(loan.borrowerName)} 的借用详情</strong>
+            <div>电话：${escapeHtml(loan.phone)}</div>
+            <div>归还期限：${formatDate(loan.endTime)}</div>
+            <div>取件时间：${formatDate(loan.pickupTime)}</div>
+            <div style="margin-top:8px;">物资清单：</div>
+            <ul style="padding-left:18px;">${loan.items.map(item => `<li>${escapeHtml(item.category || '未分类')} / ${escapeHtml(item.name)} x ${item.quantity}</li>`).join('')}</ul>
+            ${loan.note ? `<div style="margin-top:8px;">备注：${escapeHtml(loan.note)}</div>` : ''}
+        `;
+        pop.style.display = 'block';
+        pop.style.left = `${Math.min(event.clientX + 16, window.innerWidth - 380)}px`;
+        pop.style.top = `${Math.min(event.clientY + 16, window.innerHeight - 240)}px`;
+    }
+
+    function hideLoanDetail() {
+        document.getElementById('detail-pop').style.display = 'none';
+    }
+
+    async function changeLoanStatus(id, status) {
+        const text = status === 'Processed'
+            ? '确认已私联理事并告知借用人临时密码，同时执行借出扣库存？'
+            : '确认设备已线下归还，并加回库存？';
+        if (!confirm(text)) return;
+        try {
+            const res = await fetch(`/api/loan/loans/${encodeURIComponent(id)}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            const result = await parseApiResponse(res);
+            if (!result.success) throw new Error(result.error);
+            await Promise.all([loadLoanData(), loadInventory()]);
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    function renderInventory() {
+        const grid = document.getElementById('inventory-grid');
+        const tabs = document.getElementById('category-tabs');
+        const keyword = (document.getElementById('inventory-search')?.value || '').trim().toLowerCase();
+        const filtered = loanInventory.filter(item => {
+            const text = `${item.category || ''} ${item.name || ''} ${item.displayStatus || ''}`.toLowerCase();
+            return !keyword || text.includes(keyword);
+        });
+
+        if (loanInventory.length === 0) {
+            tabs.innerHTML = '';
+            grid.innerHTML = '<p style="color:#999;">暂无设备</p>';
+            return;
+        }
+        if (filtered.length === 0) {
+            tabs.innerHTML = '';
+            grid.innerHTML = '<p style="color:#999;">没有匹配的设备</p>';
+            return;
+        }
+
+        const grouped = groupInventoryByCategory(filtered);
+        const categories = Object.keys(grouped);
+        tabs.innerHTML = categories.map(category =>
+            `<button type="button" class="category-chip" onclick="scrollToInventoryCategory('${escapeAttr(category)}')">${escapeHtml(category)} (${grouped[category].length})</button>`
+        ).join('');
+
+        const defaultOpen = categories.includes('镜头') ? '镜头' : categories[0];
+        grid.innerHTML = categories.map(category => `
+            <details id="inventory-category-${safeDomId(category)}" class="inventory-category" ${category === defaultOpen || keyword ? 'open' : ''}>
+                <summary>
+                    <span>${escapeHtml(category)}</span>
+                    <span class="category-count">${grouped[category].length} 件设备</span>
+                </summary>
+                <div class="inventory-card-grid">
+                    ${grouped[category].map(renderInventoryCard).join('')}
+                </div>
+            </details>
+        `).join('');
+    }
+
+    function groupInventoryByCategory(items) {
+        return items.reduce((groups, item) => {
+            const category = item.category || '未分类';
+            if (!groups[category]) groups[category] = [];
+            groups[category].push(item);
+            return groups;
+        }, {});
+    }
+
+    function renderInventoryCard(item) {
+        const low = item.availableQuantity <= 1;
+        const checked = selectedInventoryIds.has(item.id) ? 'checked' : '';
+        return `
+            <div class="inventory-card-item">
+                <div class="inventory-card-head">
+                    <div class="inventory-card-title">${escapeHtml(item.name)}</div>
+                    ${inventoryBatchMode ? `<input class="select-check" type="checkbox" ${checked} onchange="toggleInventorySelection('${item.id}', this.checked)">` : ''}
+                </div>
+                <div>
+                    <div class="stock-number ${low ? 'low' : ''}">${item.availableQuantity}</div>
+                    <div style="color:#7f8c8d; font-size:13px;">可用 / 总数 ${item.totalQuantity}</div>
+                </div>
+                <div>${equipmentStatusBadge(item)}</div>
+                <div class="mini-actions">
+                    <button class="warning-btn" onclick="editInventory('${item.id}')">修改</button>
+                    <button class="danger-btn" onclick="deleteInventory('${item.id}')">删除</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function scrollToInventoryCategory(category) {
+        const el = document.getElementById(`inventory-category-${safeDomId(category)}`);
+        if (!el) return;
+        el.open = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function toggleBatchMode() {
+        inventoryBatchMode = !inventoryBatchMode;
+        if (!inventoryBatchMode) selectedInventoryIds.clear();
+        renderInventory();
+    }
+
+    function toggleInventorySelection(id, checked) {
+        if (checked) selectedInventoryIds.add(id);
+        else selectedInventoryIds.delete(id);
+    }
+
+    async function applyBatchEdit() {
+        if (!inventoryBatchMode) return showInventoryMessage('请先点击“批量修改”进入勾选模式。', 'error');
+        if (selectedInventoryIds.size === 0) return showInventoryMessage('请先勾选需要批量修改的设备。', 'error');
+        const availableQuantity = prompt('将选中设备的可用数量统一修改为：');
+        if (availableQuantity === null) return;
+        const value = Number(availableQuantity);
+        if (!Number.isInteger(value) || value < 0) return showInventoryMessage('可用数量必须是非负整数。', 'error');
+
+        try {
+            for (const id of selectedInventoryIds) {
+                const item = loanInventory.find(entry => entry.id === id);
+                if (!item) continue;
+                const res = await fetch(`/api/loan/inventory/${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ availableQuantity: value })
+                });
+                const result = await parseApiResponse(res);
+                if (!result.success) throw new Error(result.error);
+            }
+            showInventoryMessage('批量库存已更新。', 'success');
+            selectedInventoryIds.clear();
+            await loadInventory();
+        } catch (error) {
+            showInventoryMessage(error.message, 'error');
+        }
+    }
+
+    async function createInventory(event) {
+        event.preventDefault();
+        const payload = {
+            category: document.getElementById('item-category').value.trim(),
+            name: document.getElementById('item-name').value.trim(),
+            totalQuantity: Number(document.getElementById('item-total').value),
+            availableQuantity: Number(document.getElementById('item-available').value),
+            status: document.getElementById('item-status').value
+        };
+        try {
+            const res = await fetch('/api/loan/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await parseApiResponse(res);
+            if (!result.success) throw new Error(result.error);
+            showInventoryMessage('设备已增加。', 'success');
+            event.target.reset();
+            document.getElementById('item-total').value = 1;
+            document.getElementById('item-available').value = 1;
+            await loadInventory();
+        } catch (error) {
+            showInventoryMessage(error.message, 'error');
+        }
+    }
+
+    async function editInventory(id) {
+        const item = loanInventory.find(entry => entry.id === id);
+        if (!item) return;
+        const category = prompt('设备分类', item.category || '未分类');
+        if (category === null) return;
+        const name = prompt('设备名称', item.name);
+        if (name === null) return;
+        const totalQuantity = prompt('总数量', item.totalQuantity);
+        if (totalQuantity === null) return;
+        const availableQuantity = prompt('剩余可用数量', item.availableQuantity);
+        if (availableQuantity === null) return;
+        const status = prompt('设备状态（在库/需要维修）', item.status);
+        if (status === null) return;
+        try {
+            const res = await fetch(`/api/loan/inventory/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    category,
+                    name,
+                    totalQuantity: Number(totalQuantity),
+                    availableQuantity: Number(availableQuantity),
+                    status
+                })
+            });
+            const result = await parseApiResponse(res);
+            if (!result.success) throw new Error(result.error);
+            showInventoryMessage('设备库存已更新。', 'success');
+            await loadInventory();
+        } catch (error) {
+            showInventoryMessage(error.message, 'error');
+        }
+    }
+
+    async function deleteInventory(id) {
+        if (!confirm('确认删除该设备吗？')) return;
+        try {
+            const res = await fetch(`/api/loan/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            const result = await parseApiResponse(res);
+            if (!result.success) throw new Error(result.error);
+            showInventoryMessage('设备已删除。', 'success');
+            await loadInventory();
+        } catch (error) {
+            showInventoryMessage(error.message, 'error');
+        }
+    }
+
+    function showInventoryMessage(text, type) {
+        const msg = document.getElementById('inventory-message');
+        msg.className = `status-message ${type}`;
+        msg.textContent = text;
+    }
+
+    function formatLoanItems(items) {
+        return items.map(item => `${escapeHtml(item.category || '未分类')} / ${escapeHtml(item.name)} x ${item.quantity}`).join('；');
+    }
+
+    function equipmentStatusBadge(item) {
+        const type = item.displayStatusType || (item.status === '需要维修' ? 'repair' : 'stored');
+        const classMap = {
+            stored: 'returned',
+            'in-use': 'in-use',
+            repair: 'repair',
+            overdue: 'overdue'
+        };
+        return `<span class="badge ${classMap[type] || 'returned'}">${escapeHtml(item.displayStatus || item.status)}</span>`;
+    }
+
+    async function parseApiResponse(res) {
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await res.text();
+            const hint = text.trim().startsWith('<')
+                ? '接口返回了 HTML 页面，请重启 Node 服务后再试。'
+                : text.slice(0, 120);
+            throw new Error(hint);
+        }
+        return res.json();
+    }
+
+    function formatDate(value) {
+        if (!value) return '-';
+        return new Date(value).toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function escapeHtml(text) {
+        return String(text || '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
+    function escapeAttr(text) {
+        return String(text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function safeDomId(text) {
+        let hash = 0;
+        String(text || '').split('').forEach(char => {
+            hash = ((hash << 5) - hash) + char.charCodeAt(0);
+            hash |= 0;
+        });
+        return `cat-${Math.abs(hash)}`;
+    }
+</script>
 </body>
 </html>
